@@ -17,8 +17,7 @@ int main() {
 
         std::vector<unsigned char> buffer(MAX_CHUNK_SIZE);
         std::size_t length;
-        while ((length = std::fread(
-                    &buffer[0], sizeof buffer[0], buffer.size(), stdin)) > 0) {
+        while ((length = std::fread(&buffer[0], sizeof buffer[0], buffer.size(), stdin)) > 0) {
             std::vector<unsigned char> chunk(buffer.begin(),
                                              buffer.begin() + length);
             process_chunk(chunk);
