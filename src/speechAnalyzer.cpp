@@ -2,6 +2,7 @@
 
 #include "json.hpp"
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <regex>
 #include <string>
 #include <thread>
@@ -19,11 +20,13 @@ class JsonBuilder{
 
 	public:
 	JsonBuilder(){
-		this->j["lld"] = {};
-		this->j["tmeta"] = {};
+		this->j["header"] = {};
+		this->j["msg"] = {};
+		this->j["data"] = {};
+		this->j["data"]["features"]["lld"] = {};
+		this->j["data"]["tmeta"] = {};
 
 	}
-
 	void process_message(smilelogmsg_t message){
 		std::string temp(message.text);
 		temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end()); 
@@ -31,13 +34,14 @@ class JsonBuilder{
 			if(temp.find("lld") != std::string::npos){
 				std::cout << j << std::endl;
 				tmeta = false;
+				create_header();
 			}
 			if(tmeta){
 				auto equals_index = temp.find('=');
 				std::string field = temp.substr(0, equals_index);
 				double value = std::atof(temp.substr(equals_index+1).c_str());
 
-				this->j["tmeta"][field] = value;
+				this->j["data"]["tmeta"][field] = value;
 			}
 		}
 
@@ -47,7 +51,7 @@ class JsonBuilder{
 			std::string field = temp.substr(dot_index+1, equals_index-dot_index-1);
 			double value = std::atof(temp.substr(equals_index+1).c_str());
 
-			this->j["lld"][field] = value;
+			this->j["data"]["features"]["lld"][field] = value;
 		}
 		
 		if(temp.find("tmeta:") != std::string::npos){
@@ -58,6 +62,21 @@ class JsonBuilder{
 	private:
 	bool tmeta = false;
 	nlohmann::json j;
+
+	void create_header(){
+		std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+		
+		j["header"]["timestamp"] = timestamp;
+		j["header"]["message_type"] = "observation";
+		j["header"]["version"] = "0.1";
+
+		j["msg"]["timestamp"] = timestamp;
+		j["msg"]["experiment_id"] = nullptr;
+		j["msg"]["trial_id"] = nullptr;
+		j["msg"]["version"] = "0.1";
+		j["msg"]["source"] = "tomcat_speech_analyzer";
+		j["msg"]["sub_type"] = "speech_analysis";
+	}
 
 };
 
@@ -87,7 +106,7 @@ void parse_audio_data(smileobj_t* handle){
         if (std::ferror(stdin)) {
             throw(std::runtime_error(std::strerror(errno)));
         }
-	
+
 	float chunk[MAX_NUM_SAMPLES];
         std::size_t length;
         while ((length = std::fread(chunk, sizeof(float), MAX_NUM_SAMPLES, stdin)) > 0) {
@@ -112,6 +131,7 @@ void parse_audio_data(smileobj_t* handle){
 
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
 
+	
 	JsonBuilder *builder = (JsonBuilder*)(param);
 	builder->process_message(message);
 }
