@@ -79,7 +79,7 @@ class JsonBuilder{
 	}
 
 };
-
+		
 int main() {
 
     //JsonBuilder object which will be passed to openSMILE log callback
@@ -107,14 +107,11 @@ void parse_audio_data(smileobj_t* handle){
             throw(std::runtime_error(std::strerror(errno)));
         }
 
-	float chunk[MAX_NUM_SAMPLES];
+	char chunk[MAX_NUM_SAMPLES*4];
         std::size_t length;
-        while ((length = std::fread(chunk, sizeof(float), MAX_NUM_SAMPLES, stdin)) > 0) {
-		if(length < MAX_NUM_SAMPLES){
-			memset(&chunk[length],0,(MAX_NUM_SAMPLES-length)*sizeof(float));
-		}
+        while ((length = std::fread(chunk, 1, MAX_NUM_SAMPLES*4, stdin)) > 0) {
 		while(true){
-			smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)chunk, length*sizeof(float));
+			smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)chunk, length);
 			if(result == SMILE_SUCCESS){
 				break;
 			}
