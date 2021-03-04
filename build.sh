@@ -14,9 +14,6 @@ then
 	#JSON
 	git clone https://github.com/nlohmann/json.git
 	
-	#BOOST
-	wget -c 'http://sourceforge.net/projects/boost/files/boost/1.75.0/boost_1_75_0.tar.bz2/download'
-	tar --bzip2 -xf download
 	cd .. 
 fi
 
