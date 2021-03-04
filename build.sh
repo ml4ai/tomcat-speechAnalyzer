@@ -10,9 +10,6 @@ then
 	cd opensmile
 	bash build.sh
 	cd ..
-
-	#JSON
-	git clone https://github.com/nlohmann/json.git
 	
 	cd .. 
 fi
