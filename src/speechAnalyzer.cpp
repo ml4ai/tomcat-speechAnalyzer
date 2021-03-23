@@ -180,14 +180,5 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 	    }
 	    j["data"]["alternatives"] = alternatives;
             std::cout << j << std::endl; 
-	    /*for (int r = 0; r < response.results_size(); ++r) {
-	      const auto& result = response.results(r);
-	      std::cout << "Result stability: " << result.stability() << std::endl;
-	      for (int a = 0; a < result.alternatives_size(); ++a) {
-		const auto& alternative = result.alternatives(a);
-		std::cout << alternative.confidence() << "\t"
-			  << alternative.transcript() << std::endl;
-	      }
-	    }*/
     }
 }
