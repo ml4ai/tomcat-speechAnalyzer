@@ -44,7 +44,7 @@ void log_callback(smileobj_t*, smilelogmsg_t, void*);
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 						      StreamingRecognizeResponse>*);
 int main(int argc, char * argv[]) {
-
+    std::string mode;
     //Handle options
     try{
 	options_description desc{"Options"};
@@ -55,14 +55,13 @@ int main(int argc, char * argv[]) {
 	store(parse_command_line(argc, argv, desc), vm);
 
 	if(vm.count("mode")){
-		std::cout << vm["mode"].as<std::string>() << std::endl;
-	}
-	else{
-		std::cout << "FAILURE" << std::endl;
+		mode = vm["mode"].as<std::string>();
+//		std::cout << "Starting speechAnalyzer in " <<  vm["mode"].as<std::string>() << " mode" <<  std::endl;
 	}
     }
     catch(const error &ex){
-
+	std::cout << "Error parsing arguments" << std::endl;
+	return -1;
     }
 
     //JsonBuilder object which will be passed to openSMILE log callback
@@ -92,12 +91,24 @@ int main(int argc, char * argv[]) {
     handle = smile_new();
     smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
     smile_set_log_callback(handle, &log_callback, &builder);
-    std::thread thread_object(smile_run, handle);
-    std::thread thread_object2(read_chunks_websocket, handle, streamer.get());
-//    std::thread thread_object3(read_responses, streamer.get());
-    thread_object.join();
-    thread_object2.join();
-    //thread_object3.join();
+    
+    if(mode.compare("stdin") == 0){
+	    std::thread thread_object(smile_run, handle);
+	    std::thread thread_object2(read_chunks_stdin, handle, streamer.get());
+	    std::thread thread_object3(read_responses, streamer.get());
+	    thread_object.join();
+	    thread_object2.join();
+	    thread_object3.join();
+    }
+    else if(mode.compare("websocket") == 0){
+	    std::thread thread_object(smile_run, handle);
+	    std::thread thread_object2(read_chunks_websocket, handle, streamer.get());
+	    thread_object.join();
+	    thread_object2.join();
+    }
+    else{
+	std::cout << "Unknown mode" << std::endl;
+    } 
 
     grpc::Status status = streamer->Finish();
     if (!status.ok()) {
