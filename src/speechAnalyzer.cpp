@@ -1,4 +1,5 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/program_options.hpp>
 #include <grpc++/grpc++.h>
 #include <regex>
 #include <string>
@@ -31,6 +32,7 @@ using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::RecognitionConfig;
 
+using namespace boost::program_options;
 const size_t MAX_NUM_SAMPLES = 512;
 
 void read_chunks_stdin(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,StreamingRecognizeResponse>*);
@@ -42,6 +44,26 @@ void log_callback(smileobj_t*, smilelogmsg_t, void*);
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 						      StreamingRecognizeResponse>*);
 int main(int argc, char * argv[]) {
+
+    //Handle options
+    try{
+	options_description desc{"Options"};
+	desc.add_options()
+	  ("help,h", "Help screen")
+	  ("mode", value<std::string>()->default_value("stdin"), "Where to read audio chunks from");
+	variables_map vm;
+	store(parse_command_line(argc, argv, desc), vm);
+
+	if(vm.count("mode")){
+		std::cout << vm["mode"].as<std::string>() << std::endl;
+	}
+	else{
+		std::cout << "FAILURE" << std::endl;
+	}
+    }
+    catch(const error &ex){
+
+    }
 
     //JsonBuilder object which will be passed to openSMILE log callback
     JsonBuilder builder;
@@ -71,11 +93,11 @@ int main(int argc, char * argv[]) {
     smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
     smile_set_log_callback(handle, &log_callback, &builder);
     std::thread thread_object(smile_run, handle);
-    std::thread thread_object2(read_chunks_stdin, handle, streamer.get());
-    std::thread thread_object3(read_responses, streamer.get());
+    std::thread thread_object2(read_chunks_websocket, handle, streamer.get());
+//    std::thread thread_object3(read_responses, streamer.get());
     thread_object.join();
     thread_object2.join();
-    thread_object3.join();
+    //thread_object3.join();
 
     grpc::Status status = streamer->Finish();
     if (!status.ok()) {
@@ -125,7 +147,7 @@ void read_chunks_stdin(smileobj_t* handle, grpc::ClientReaderWriterInterface<Str
 void read_chunks_websocket(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 					                                    StreamingRecognizeResponse>* streamer){
 	auto const address = asio::ip::make_address("127.0.0.1");
-	auto const port = static_cast<unsigned short>(8080);
+	auto const port = static_cast<unsigned short>(8888);
 	auto const doc_root = make_shared<std::string>(".");
 	auto const n_threads = 1;
 
