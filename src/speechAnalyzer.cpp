@@ -14,6 +14,18 @@
 #include "parse_arguments.h" 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 
+#include "util.hpp"
+#include "WebsocketSession.hpp"
+#include "HTTPSession.hpp"
+#include "Listener.hpp"
+
+namespace beast = boost::beast;
+namespace http = beast::http;
+namespace ws = beast::websocket;
+namespace asio = boost::asio;
+
+using tcp = boost::asio::ip::tcp;
+
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
@@ -21,12 +33,15 @@ using google::cloud::speech::v1::RecognitionConfig;
 
 const size_t MAX_NUM_SAMPLES = 512;
 
-void parse_audio_data(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-                                                                     StreamingRecognizeResponse>*);
+void read_chunks_stdin(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,StreamingRecognizeResponse>*);
+void read_chunks_websocket(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>*);
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
 
-		
-int main() {
+
+
+void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
+						      StreamingRecognizeResponse>*);
+int main(int argc, char * argv[]) {
 
     //JsonBuilder object which will be passed to openSMILE log callback
     JsonBuilder builder;
@@ -48,6 +63,7 @@ int main() {
     streaming_config->mutable_config()->set_language_code("en");
     streaming_config->mutable_config()->set_sample_rate_hertz(16000);
     streaming_config->mutable_config()->set_encoding(RecognitionConfig::LINEAR16);
+    streaming_config->mutable_config()->set_max_alternatives(5);
     streaming_config->set_interim_results(true);
     streamer->Write(request);
 
@@ -55,24 +71,12 @@ int main() {
     smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
     smile_set_log_callback(handle, &log_callback, &builder);
     std::thread thread_object(smile_run, handle);
-    std::thread thread_object2(parse_audio_data, handle, streamer.get());
-
+    std::thread thread_object2(read_chunks_stdin, handle, streamer.get());
+    std::thread thread_object3(read_responses, streamer.get());
     thread_object.join();
     thread_object2.join();
+    thread_object3.join();
 
-    StreamingRecognizeResponse response;
-    while (streamer->Read(&response)) {  // Returns false when no more to read.
-    // Dump the transcript of all the results.
-	    for (int r = 0; r < response.results_size(); ++r) {
-	      const auto& result = response.results(r);
-	      std::cout << "Result stability: " << result.stability() << std::endl;
-	      for (int a = 0; a < result.alternatives_size(); ++a) {
-		const auto& alternative = result.alternatives(a);
-		std::cout << alternative.confidence() << "\t"
-			  << alternative.transcript() << std::endl;
-	      }
-	    }
-    }
     grpc::Status status = streamer->Finish();
     if (!status.ok()) {
         // Report the RPC failure.
@@ -83,7 +87,7 @@ int main() {
     return 0;
 }
 
-void parse_audio_data(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
+void read_chunks_stdin(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 					                                    StreamingRecognizeResponse>* streamer){
     StreamingRecognizeRequest request;
     try {
@@ -118,9 +122,72 @@ void parse_audio_data(smileobj_t* handle, grpc::ClientReaderWriterInterface<Stre
 
 }
 
+void read_chunks_websocket(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
+					                                    StreamingRecognizeResponse>* streamer){
+	auto const address = asio::ip::make_address("127.0.0.1");
+	auto const port = static_cast<unsigned short>(8080);
+	auto const doc_root = make_shared<std::string>(".");
+	auto const n_threads = 1;
+
+	asio::io_context ioc{n_threads};
+
+	auto listener = make_shared<Listener>(ioc, tcp::endpoint{address, port}, doc_root);
+	listener->run();
+
+	asio::signal_set signals(ioc, SIGINT, SIGTERM);
+	signals.async_wait([&](beast::error_code const&, int){
+		ioc.stop();
+	});
+
+	ioc.run();
+}
+
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
 
 	
 	JsonBuilder *builder = (JsonBuilder*)(param);
 	builder->process_message(message);
+}
+
+void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
+						      StreamingRecognizeResponse>* streamer){
+    
+    StreamingRecognizeResponse response;
+    while (streamer->Read(&response)) {  // Returns false when no more to read.
+    // Dump the transcript of all the results.
+		
+	    std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+	    nlohmann::json j;
+	    j["header"]["timestamp"] = timestamp;
+	    j["header"]["message_type"] = "observation";
+	    j["header"]["version"] = 0.1;
+	    j["msg"]["timestamp"] = timestamp;
+	    j["msg"]["experiment_id"] = nullptr;
+	    j["msg"]["trial_id"] = nullptr;
+	    j["msg"]["version"] = "0.1";
+	    j["msg"]["source"] = "tomcat_speech_analyzer";
+	    j["msg"]["sub_type"] = "speech_analysis";
+	    j["data"]["text"] = response.results(0).alternatives(0).transcript();
+	    j["data"]["is_final"] = response.results(0).is_final();
+	    j["data"]["asr_system"] = "google";
+            j["data"]["participant_id"] = nullptr;
+	    
+	    std::vector<nlohmann::json> alternatives;
+	    auto result = response.results(0);
+	    for(int i=0; i<result.alternatives_size(); i++){
+		auto alternative = result.alternatives(i); 
+		alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
+	    }
+	    j["data"]["alternatives"] = alternatives;
+            std::cout << j << std::endl; 
+	    /*for (int r = 0; r < response.results_size(); ++r) {
+	      const auto& result = response.results(r);
+	      std::cout << "Result stability: " << result.stability() << std::endl;
+	      for (int a = 0; a < result.alternatives_size(); ++a) {
+		const auto& alternative = result.alternatives(a);
+		std::cout << alternative.confidence() << "\t"
+			  << alternative.transcript() << std::endl;
+	      }
+	    }*/
+    }
 }
