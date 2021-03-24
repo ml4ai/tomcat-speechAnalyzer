@@ -160,7 +160,7 @@ void read_chunks_websocket(smileobj_t* handle, grpc::ClientReaderWriterInterface
 	auto const address = asio::ip::make_address("127.0.0.1");
 	auto const port = static_cast<unsigned short>(8888);
 	auto const doc_root = make_shared<std::string>(".");
-	auto const n_threads = 1;
+	auto const n_threads = 4;
 
 	asio::io_context ioc{n_threads};
 
@@ -172,7 +172,16 @@ void read_chunks_websocket(smileobj_t* handle, grpc::ClientReaderWriterInterface
 		ioc.stop();
 	});
 
+	std::vector<std::thread> threads;
+	threads.reserve(n_threads-1);
+	for(auto i=n_threads; i>0; --i){
+		threads.emplace_back([&ioc] { ioc.run(); });
+	}
 	ioc.run();
+
+	for(auto& thread : threads){
+		thread.join();
+	}
 }
 
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
