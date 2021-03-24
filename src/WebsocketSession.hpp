@@ -78,10 +78,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     streamer) {
 
         StreamingRecognizeRequest request;
-
+	std::cout << "SEND" << std::endl;
         std::vector<float> chunk;
         while (!this->done) {
             while (this->spsc_queue.pop(&chunk)) {
+		std::cout << chunk.size() << std::endl;
                 std::vector<int16_t> intVec(chunk.size());
                 for (float f : chunk) {
                     f = f * 32768;
@@ -97,10 +98,13 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 request.set_audio_content(&intVec[0], intVec.size());
                 streamer->Write(request);
             }
+
         }
+	streamer->WritesDone();
     }
 
     int process_audio(void) {
+	std::cout << "PROCESS" << std::endl;
         auto creds = grpc::GoogleDefaultCredentials();
         auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
         std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
@@ -141,6 +145,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             }
         }
 
+	std::cout << "DONE" << std::endl;
         grpc::Status status = streamer->Finish();
         send_chunks_thread.join();
         if (!status.ok()) {
@@ -153,7 +158,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_accept(beast::error_code ec) {
-        if (ec) {
+        std::cout << "ACCEPT" << std::endl;
+	if (ec) {
             return fail(ec, "accept");
         }
 
