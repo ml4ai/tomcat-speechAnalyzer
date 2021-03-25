@@ -69,9 +69,9 @@ int main(int argc, char * argv[]) {
 
     if(mode.compare("stdin") == 0){
 	    std::thread thread_object(read_chunks_stdin);
-	    //std::thread thread_object2(write_thread);
+	    std::thread thread_object2(write_thread);
 	    thread_object.join();
-	    //thread_object2.join();
+	    thread_object2.join();
     }
     else if(mode.compare("websocket") == 0){
 	    //std::thread thread_object(smile_run, handle);
@@ -99,12 +99,7 @@ void read_chunks_stdin(){
 	std::vector<char> chunk(1024);
         std::size_t length;
         while ((length = std::fread(&chunk[0], 1, 1024, stdin)) > 0) {
-		std::cout << "IN" << std::endl;
 		shared.push(chunk);
-	}
-	std::cout << "DONE" << std::endl;
-	while(shared.pop(&chunk)){
-		std::cout << "OUT" << std::endl;
 	}
 }
 
@@ -179,8 +174,7 @@ void write_thread(){
 	
 	StreamingRecognizeRequest content_request;
 	std::vector<char> chunk(1024);
-	while(shared.pop(&chunk)){
-		std::cout << "TEST" << std::endl;
+	while(shared.pop(chunk)){
 		
 		//Write to opensmile
 		while(true){
