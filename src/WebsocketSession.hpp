@@ -6,7 +6,7 @@
 #include <grpc++/grpc++.h>
 #include <range/v3/all.hpp>
 #include <thread>
-
+#include <fstream>
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
@@ -76,13 +76,13 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     send_chunks(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
                                                   StreamingRecognizeResponse>*
                     streamer) {
-
+	ofstream float_sample("float_sample", std::ios::out | std::ios::binary | std::ios::app);
+	ofstream int_sample("int_sample", std::ios::out | std::ios::binary | std::ios::app);
         StreamingRecognizeRequest request;
 	std::cout << "SEND" << std::endl;
         std::vector<float> chunk;
         while (!this->done) {
             while (this->spsc_queue.pop(&chunk)) {
-		std::cout << chunk.size() << std::endl;
                 std::vector<int16_t> intVec(chunk.size());
                 for (float f : chunk) {
                     f = f * 32768;
@@ -95,11 +95,15 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     int16_t i = (int16_t)f;
                     intVec.push_back(i);
                 }
-                request.set_audio_content(&intVec[0], intVec.size());
+		float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
+                int_sample.write((char *)&intVec[0], sizeof(int16_t)*intVec.size());
+		request.set_audio_content(&intVec[0], intVec.size());
                 streamer->Write(request);
             }
 
         }
+	float_sample.close();
+	int_sample.close();
 	streamer->WritesDone();
     }
 
@@ -118,7 +122,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         config->set_sample_rate_hertz(48000);
         config->set_encoding(
             google::cloud::speech::v1::RecognitionConfig::LINEAR16);
-        grpc::ClientContext context;
+        streaming_config->set_interim_results(true);
+	grpc::ClientContext context;
         auto streamer = speech->StreamingRecognize(&context);
 
         // Write the first request, containing the config only.
@@ -131,9 +136,9 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         StreamingRecognizeResponse response;
 
         while (streamer->Read(&response)) {
-            std::cout << "flag 2" << std::endl;
+	    std::cout << "READ" << std::endl;
+	    std::cout << response.results_size();
             for (int r = 0; r < response.results_size(); ++r) {
-                std::cout << "flag 3" << std::endl;
                 const auto& result = response.results(r);
                 std::cout << "Result stability: " << result.stability()
                           << std::endl;
