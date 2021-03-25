@@ -1,4 +1,5 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 #include <boost/program_options.hpp>
 #include <grpc++/grpc++.h>
 #include <regex>
@@ -35,14 +36,16 @@ using google::cloud::speech::v1::RecognitionConfig;
 using namespace boost::program_options;
 const size_t MAX_NUM_SAMPLES = 512;
 
-void read_chunks_stdin(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,StreamingRecognizeResponse>*);
+void read_chunks_stdin();
 void read_chunks_websocket(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>*);
+void write_thread();
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
 
 
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 						      StreamingRecognizeResponse>*);
+boost::lockfree::spsc_queue<std::vector<char>, boost::lockfree::capacity<1024>> shared;
 int main(int argc, char * argv[]) {
     std::string mode;
     //Handle options
@@ -64,95 +67,45 @@ int main(int argc, char * argv[]) {
 	return -1;
     }
 
-    //JsonBuilder object which will be passed to openSMILE log callback
-    JsonBuilder builder;
-
-    //Initialize and start opensmile
-    smileobj_t* handle;
-
-    //Create a Speech Stub connected to speech service
-    auto creds = grpc::GoogleDefaultCredentials();
-    auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
-    std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
-    //Handle streaming config
-    StreamingRecognizeRequest request;
-    auto* streaming_config = request.mutable_streaming_config();
-    //Begin a stream
-    grpc::ClientContext context;
-    auto streamer = speech->StreamingRecognize(&context);
-    //Write first request with config
-    streaming_config->mutable_config()->set_language_code("en");
-    streaming_config->mutable_config()->set_sample_rate_hertz(16000);
-    streaming_config->mutable_config()->set_encoding(RecognitionConfig::LINEAR16);
-    streaming_config->mutable_config()->set_max_alternatives(5);
-    streaming_config->set_interim_results(true);
-    streamer->Write(request);
-
-    handle = smile_new();
-    smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
-    smile_set_log_callback(handle, &log_callback, &builder);
-    
     if(mode.compare("stdin") == 0){
-	    std::thread thread_object(smile_run, handle);
-	    std::thread thread_object2(read_chunks_stdin, handle, streamer.get());
-	    std::thread thread_object3(read_responses, streamer.get());
+	    std::thread thread_object(read_chunks_stdin);
+	    //std::thread thread_object2(write_thread);
 	    thread_object.join();
-	    thread_object2.join();
-	    thread_object3.join();
+	    //thread_object2.join();
     }
     else if(mode.compare("websocket") == 0){
-	    std::thread thread_object(smile_run, handle);
-	    std::thread thread_object2(read_chunks_websocket, handle, streamer.get());
-	    thread_object.join();
-	    thread_object2.join();
+	    //std::thread thread_object(smile_run, handle);
+	    //std::thread thread_object2(read_chunks_websocket, handle, streamer.get());
+	    //thread_object.join();
+	    //thread_object2.join();
     }
     else{
 	std::cout << "Unknown mode" << std::endl;
     } 
 
-    grpc::Status status = streamer->Finish();
-    if (!status.ok()) {
+    //grpc::Status status = streamer->Finish();
+    /*if (!status.ok()) {
         // Report the RPC failure.
         std::cerr << status.error_message() << std::endl;
 	return -1;
-    }
+    }*/
 
     return 0;
 }
 
-void read_chunks_stdin(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-					                                    StreamingRecognizeResponse>* streamer){
-    StreamingRecognizeRequest request;
-    try {
-        std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
+void read_chunks_stdin(){
+    	std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
 
-        if (std::ferror(stdin)) {
-            throw(std::runtime_error(std::strerror(errno)));
-        }
-
-	char chunk[MAX_NUM_SAMPLES*4];
+	std::vector<char> chunk(1024);
         std::size_t length;
-        while ((length = std::fread(chunk, 1, MAX_NUM_SAMPLES*4, stdin)) > 0) {
-		//Write the chunk to cExternalAudioSource
-		while(true){
-			smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)chunk, length);
-			if(result == SMILE_SUCCESS){
-				break;
-			}
-		}
-		//Send the chunk to google for asr
-		request.set_audio_content(&chunk[0], length);
-		streamer->Write(request);
-
+        while ((length = std::fread(&chunk[0], 1, 1024, stdin)) > 0) {
+		std::cout << "IN" << std::endl;
+		shared.push(chunk);
 	}
-	streamer->WritesDone();
-    }
-    catch (std::exception const& e) {
-        std::cerr << e.what() << std::endl;
-    }
-    
-    smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
-
+	std::cout << "DONE" << std::endl;
+	while(shared.pop(&chunk)){
+		std::cout << "OUT" << std::endl;
+	}
 }
 
 void read_chunks_websocket(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
@@ -189,6 +142,63 @@ void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
 	
 	JsonBuilder *builder = (JsonBuilder*)(param);
 	builder->process_message(message);
+}
+
+void write_thread(){
+	//JsonBuilder object which will be passed to openSMILE log callback
+	JsonBuilder builder;
+
+	//Initialize and start opensmile
+	smileobj_t* handle;
+
+	//Create a Speech Stub connected to speech service
+	auto creds = grpc::GoogleDefaultCredentials();
+	auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
+	std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
+	//Handle streaming config
+	StreamingRecognizeRequest request;
+	auto* streaming_config = request.mutable_streaming_config();
+	//Begin a stream
+	grpc::ClientContext context;
+	auto streamer = speech->StreamingRecognize(&context);
+	//Write first request with config
+	streaming_config->mutable_config()->set_language_code("en");
+	streaming_config->mutable_config()->set_sample_rate_hertz(16000);
+	streaming_config->mutable_config()->set_encoding(RecognitionConfig::LINEAR16);
+	streaming_config->mutable_config()->set_max_alternatives(5);
+	streaming_config->set_interim_results(true);
+	streamer->Write(request);
+
+	handle = smile_new();
+	smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
+	smile_set_log_callback(handle, &log_callback, &builder);
+
+	//Initialize opensmile thread
+	std::thread opensmile_thread(smile_run, handle);
+	
+	
+	StreamingRecognizeRequest content_request;
+	std::vector<char> chunk(1024);
+	while(shared.pop(&chunk)){
+		std::cout << "TEST" << std::endl;
+		
+		//Write to opensmile
+		while(true){
+			smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size());
+			if(result == SMILE_SUCCESS){
+				break;
+			}
+		}
+
+		//Write to google asr
+		content_request.set_audio_content(&chunk[0], chunk.size());
+		streamer->Write(request);
+	}
+
+	streamer->WritesDone();
+	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
+
+	opensmile_thread.join();
 }
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
