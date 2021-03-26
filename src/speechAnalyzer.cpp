@@ -15,6 +15,7 @@
 #include "JsonBuilder.cpp"
 #include "parse_arguments.h" 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "spsc.h"
 
 #include "util.hpp"
 #include "WebsocketSession.hpp"
@@ -37,7 +38,7 @@ using namespace boost::program_options;
 const size_t MAX_NUM_SAMPLES = 512;
 
 void read_chunks_stdin();
-void read_chunks_websocket(smileobj_t*, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>*);
+void read_chunks_websocket();
 void write_thread();
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
 
@@ -45,7 +46,9 @@ void log_callback(smileobj_t*, smilelogmsg_t, void*);
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 						      StreamingRecognizeResponse>*);
-boost::lockfree::spsc_queue<std::vector<char>, boost::lockfree::capacity<1024>> shared;
+boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>> shared;
+bool shared_done = false;
+
 int main(int argc, char * argv[]) {
     std::string mode;
     //Handle options
@@ -74,10 +77,10 @@ int main(int argc, char * argv[]) {
 	    thread_object2.join();
     }
     else if(mode.compare("websocket") == 0){
-	    //std::thread thread_object(smile_run, handle);
-	    //std::thread thread_object2(read_chunks_websocket, handle, streamer.get());
-	    //thread_object.join();
-	    //thread_object2.join();
+	    std::thread thread_object(read_chunks_websocket);
+	    std::thread thread_object2(write_thread);
+	    thread_object.join();
+	    thread_object2.join();
     }
     else{
 	std::cout << "Unknown mode" << std::endl;
@@ -96,15 +99,16 @@ int main(int argc, char * argv[]) {
 void read_chunks_stdin(){
     	std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
 
-	std::vector<char> chunk(1024);
+	std::vector<float> chunk(1024);
         std::size_t length;
-        while ((length = std::fread(&chunk[0], 1, 1024, stdin)) > 0) {
+        while ((length = std::fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
 		shared.push(chunk);
 	}
+
+	shared_done = true;
 }
 
-void read_chunks_websocket(smileobj_t* handle, grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-					                                    StreamingRecognizeResponse>* streamer){
+void read_chunks_websocket(){
 	auto const address = asio::ip::make_address("127.0.0.1");
 	auto const port = static_cast<unsigned short>(8888);
 	auto const doc_root = make_shared<std::string>(".");
@@ -140,6 +144,7 @@ void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
 }
 
 void write_thread(){
+	std::cout << "WRITE_THREAD" << std::endl;
 	//JsonBuilder object which will be passed to openSMILE log callback
 	JsonBuilder builder;
 
@@ -173,22 +178,22 @@ void write_thread(){
 	
 	
 	StreamingRecognizeRequest content_request;
-	std::vector<char> chunk(1024);
-	while(shared.pop(chunk)){
-		
-		//Write to opensmile
-		while(true){
-			smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size());
-			if(result == SMILE_SUCCESS){
-				break;
+	std::vector<float> chunk(1024);
+	while(!shared_done){
+		while(shared.pop(chunk)){
+			//Write to opensmile
+			while(true){
+				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
+				if(result == SMILE_SUCCESS){
+					break;
+				}
 			}
+
+			//Write to google asr
+			content_request.set_audio_content(&chunk[0], chunk.size());
+			streamer->Write(request);
 		}
-
-		//Write to google asr
-		content_request.set_audio_content(&chunk[0], chunk.size());
-		streamer->Write(request);
 	}
-
 	streamer->WritesDone();
 	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
 

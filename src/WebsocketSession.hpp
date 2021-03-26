@@ -1,4 +1,7 @@
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "SMILEapi.h"
+#include "spsc.h"
+
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
@@ -16,6 +19,7 @@ namespace http = beast::http;     // from <boost/beast/http.hpp>
 namespace ws = beast::websocket;  // from <boost/beast/websocket.hpp>
 using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 
+
 class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     ws::stream<beast::tcp_stream> ws_;
@@ -26,7 +30,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     std::atomic<bool> done{false};
     std::thread consumer_thread;
-
   public:
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
@@ -95,8 +98,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     int16_t i = (int16_t)f;
                     intVec.push_back(i);
                 }
+
+		//Write chunks to file
 		float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
                 int_sample.write((char *)&intVec[0], sizeof(int16_t)*intVec.size());
+		//Write chunks to google speech api
 		request.set_audio_content(&intVec[0], intVec.size());
                 streamer->Write(request);
             }
@@ -109,6 +115,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     int process_audio(void) {
 	std::cout << "PROCESS" << std::endl;
+
+	//Google asr instance
         auto creds = grpc::GoogleDefaultCredentials();
         auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
         std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
@@ -149,7 +157,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
             }
         }
-
+	shared_done = true;
 	std::cout << "DONE" << std::endl;
         grpc::Status status = streamer->Finish();
         send_chunks_thread.join();
@@ -207,6 +215,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         auto chunk =
             std::vector<float>(arr, arr + (bytes_transferred / sizeof(float)));
         this->spsc_queue.push(chunk);
+	shared.push(chunk);
 
         this->ws_.async_write(
             this->buffer_.data(),
