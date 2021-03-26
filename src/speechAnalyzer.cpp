@@ -163,7 +163,7 @@ void write_thread(){
 	auto streamer = speech->StreamingRecognize(&context);
 	//Write first request with config
 	streaming_config->mutable_config()->set_language_code("en");
-	streaming_config->mutable_config()->set_sample_rate_hertz(16000);
+	streaming_config->mutable_config()->set_sample_rate_hertz(48000);
 	streaming_config->mutable_config()->set_encoding(RecognitionConfig::LINEAR16);
 	streaming_config->mutable_config()->set_max_alternatives(5);
 	streaming_config->set_interim_results(true);
@@ -176,7 +176,8 @@ void write_thread(){
 	//Initialize opensmile thread
 	std::thread opensmile_thread(smile_run, handle);
 	
-	
+	ofstream float_sample("float_sample", std::ios::out | std::ios::binary | std::ios::app);
+        ofstream int_sample("int_sample", std::ios::out | std::ios::binary | std::ios::app);	
 	StreamingRecognizeRequest content_request;
 	std::vector<float> chunk(1024);
 	while(!shared_done){
@@ -189,15 +190,58 @@ void write_thread(){
 				}
 			}
 
-			//Write to google asr
-			content_request.set_audio_content(&chunk[0], chunk.size());
+			//Convert 32f chunk to 16i chunk
+			std::vector<int16_t> int_chunk(1024);
+			for(float f : chunk){
+				int_chunk.push_back((int16_t)(f*32768));
+			}
+			
+			float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
+                	int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
+			
+			//Write to google asr service
+			content_request.set_audio_content(&int_chunk[0], int_chunk.size());
 			streamer->Write(request);
 		}
 	}
+	float_sample.close();
+        int_sample.close();	
 	streamer->WritesDone();
 	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
 
 	opensmile_thread.join();
+
+	std::cout << "READ" << std::endl;	
+	StreamingRecognizeResponse response;
+	while (streamer->Read(&response)) {  // Returns false when no more to read.
+	// Dump the transcript of all the results.
+		
+	    std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+	    nlohmann::json j;
+	    j["header"]["timestamp"] = timestamp;
+	    j["header"]["message_type"] = "observation";
+	    j["header"]["version"] = 0.1;
+	    j["msg"]["timestamp"] = timestamp;
+	    j["msg"]["experiment_id"] = nullptr;
+	    j["msg"]["trial_id"] = nullptr;
+	    j["msg"]["version"] = "0.1";
+	    j["msg"]["source"] = "tomcat_speech_analyzer";
+	    j["msg"]["sub_type"] = "speech_analysis";
+	    j["data"]["text"] = response.results(0).alternatives(0).transcript();
+	    j["data"]["is_final"] = response.results(0).is_final();
+	    j["data"]["asr_system"] = "google";
+	    j["data"]["participant_id"] = nullptr;
+	    
+	    std::vector<nlohmann::json> alternatives;
+	    auto result = response.results(0);
+	    for(int i=0; i<result.alternatives_size(); i++){
+		auto alternative = result.alternatives(i); 
+		alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
+	    }
+	    j["data"]["alternatives"] = alternatives;
+	    std::cout << j << std::endl; 
+	}
+	std::cout << "DONE" << std::endl;	
 }
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,

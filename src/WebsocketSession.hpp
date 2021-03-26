@@ -79,10 +79,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     send_chunks(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
                                                   StreamingRecognizeResponse>*
                     streamer) {
-	ofstream float_sample("float_sample", std::ios::out | std::ios::binary | std::ios::app);
-	ofstream int_sample("int_sample", std::ios::out | std::ios::binary | std::ios::app);
         StreamingRecognizeRequest request;
-	std::cout << "SEND" << std::endl;
         std::vector<float> chunk;
         while (!this->done) {
             while (this->spsc_queue.pop(&chunk)) {
@@ -99,22 +96,16 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     intVec.push_back(i);
                 }
 
-		//Write chunks to file
-		float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
-                int_sample.write((char *)&intVec[0], sizeof(int16_t)*intVec.size());
 		//Write chunks to google speech api
 		request.set_audio_content(&intVec[0], intVec.size());
                 streamer->Write(request);
             }
 
         }
-	float_sample.close();
-	int_sample.close();
 	streamer->WritesDone();
     }
 
     int process_audio(void) {
-	std::cout << "PROCESS" << std::endl;
 
 	//Google asr instance
         auto creds = grpc::GoogleDefaultCredentials();
@@ -158,7 +149,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             }
         }
 	shared_done = true;
-	std::cout << "DONE" << std::endl;
         grpc::Status status = streamer->Finish();
         send_chunks_thread.join();
         if (!status.ok()) {
@@ -192,7 +182,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
-        boost::ignore_unused(bytes_transferred);
+        std::cout << bytes_transferred << std::endl;
+	boost::ignore_unused(bytes_transferred);
 
         // This indicates that the WebsocketSession was closed
         if (ec == ws::error::closed) {
