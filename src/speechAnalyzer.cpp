@@ -58,6 +58,7 @@ int main(int argc, char * argv[]) {
 	desc.add_options()
 	  ("help,h", "Help screen")
 	  ("mode", value<std::string>()->default_value("stdin"), "Where to read audio chunks from");
+	  ("sampleRate", value<int>()->default_value(48000), "The sample rate of the input audio");
 	variables_map vm;
 	store(parse_command_line(argc, argv, desc), vm);
 
@@ -104,7 +105,7 @@ void read_chunks_stdin(){
 	std::vector<float> chunk(1024);
         std::size_t length;
         while ((length = std::fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
-		shared.push(chunk);
+		while(!shared.push(chunk)); // If queue is full will keep trying until avaliable space
 	}
 
 	read_done = true;
@@ -202,7 +203,7 @@ void write_thread(){
 			int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
 			
 			//Write to google asr service
-			content_request.set_audio_content(&int_chunk[0], int_chunk.size());
+			content_request.set_audio_content(&int_chunk[0], int_chunk.size()*sizeof(int16_t));
 			streamer->Write(content_request);
 		}
 	}
