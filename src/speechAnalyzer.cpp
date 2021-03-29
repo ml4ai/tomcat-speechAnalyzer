@@ -185,21 +185,19 @@ void write_thread(){
 	write_start = true;
 	while(!read_done){
 		while(shared.pop(chunk)){
-			std::cout << chunk.size() << std::endl;
 			//Write to opensmile
-			while(true){
+			/*while(true){
 				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
 				if(result == SMILE_SUCCESS){
 					break;
 				}
-			}
+			}*/
 
 			//Convert 32f chunk to 16i chunk
-			std::vector<int16_t> int_chunk(1024);
+			std::vector<int16_t> int_chunk;
 			for(float f : chunk){
 				int_chunk.push_back((int16_t)(f*32768));
 			}
-			
 			float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
 			int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
 			
