@@ -47,7 +47,8 @@ void log_callback(smileobj_t*, smilelogmsg_t, void*);
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 						      StreamingRecognizeResponse>*);
 boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>> shared;
-bool shared_done = false;
+bool read_done = false;
+bool write_start = false;
 
 int main(int argc, char * argv[]) {
     std::string mode;
@@ -97,6 +98,7 @@ int main(int argc, char * argv[]) {
 }
 
 void read_chunks_stdin(){
+	while(!write_start);
     	std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
 
 	std::vector<float> chunk(1024);
@@ -105,7 +107,7 @@ void read_chunks_stdin(){
 		shared.push(chunk);
 	}
 
-	shared_done = true;
+	read_done = true;
 }
 
 void read_chunks_websocket(){
@@ -144,7 +146,6 @@ void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
 }
 
 void write_thread(){
-	std::cout << "WRITE_THREAD" << std::endl;
 	//JsonBuilder object which will be passed to openSMILE log callback
 	JsonBuilder builder;
 
@@ -162,10 +163,11 @@ void write_thread(){
 	grpc::ClientContext context;
 	auto streamer = speech->StreamingRecognize(&context);
 	//Write first request with config
-	streaming_config->mutable_config()->set_language_code("en");
-	streaming_config->mutable_config()->set_sample_rate_hertz(48000);
-	streaming_config->mutable_config()->set_encoding(RecognitionConfig::LINEAR16);
-	streaming_config->mutable_config()->set_max_alternatives(5);
+	auto mutable_config = streaming_config->mutable_config();
+	mutable_config->set_language_code("en");
+	mutable_config->set_sample_rate_hertz(44100);
+	mutable_config->set_encoding(RecognitionConfig::LINEAR16);
+	mutable_config->set_max_alternatives(5);
 	streaming_config->set_interim_results(true);
 	streamer->Write(request);
 
@@ -180,8 +182,10 @@ void write_thread(){
         ofstream int_sample("int_sample", std::ios::out | std::ios::binary | std::ios::app);	
 	StreamingRecognizeRequest content_request;
 	std::vector<float> chunk(1024);
-	while(!shared_done){
+	write_start = true;
+	while(!read_done){
 		while(shared.pop(chunk)){
+			std::cout << chunk.size() << std::endl;
 			//Write to opensmile
 			while(true){
 				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
@@ -197,11 +201,11 @@ void write_thread(){
 			}
 			
 			float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
-                	int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
+			int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
 			
 			//Write to google asr service
 			content_request.set_audio_content(&int_chunk[0], int_chunk.size());
-			streamer->Write(request);
+			streamer->Write(content_request);
 		}
 	}
 	float_sample.close();
@@ -211,7 +215,6 @@ void write_thread(){
 
 	opensmile_thread.join();
 
-	std::cout << "READ" << std::endl;	
 	StreamingRecognizeResponse response;
 	while (streamer->Read(&response)) {  // Returns false when no more to read.
 	// Dump the transcript of all the results.
@@ -241,7 +244,6 @@ void write_thread(){
 	    j["data"]["alternatives"] = alternatives;
 	    std::cout << j << std::endl; 
 	}
-	std::cout << "DONE" << std::endl;	
 }
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,

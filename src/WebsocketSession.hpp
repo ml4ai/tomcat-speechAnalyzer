@@ -148,7 +148,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
             }
         }
-	shared_done = true;
+	read_done = true;
         grpc::Status status = streamer->Finish();
         send_chunks_thread.join();
         if (!status.ok()) {
