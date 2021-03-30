@@ -97,8 +97,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
 
 		//Write chunks to google speech api
-		request.set_audio_content(&intVec[0], intVec.size());
-                streamer->Write(request);
+//		request.set_audio_content(&intVec[0], intVec.size());
+//                streamer->Write(request);
             }
 
         }
@@ -135,19 +135,20 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         StreamingRecognizeResponse response;
 
         while (streamer->Read(&response)) {
-	    std::cout << "READ" << std::endl;
-	    std::cout << response.results_size();
+	//    std::cout << "READ" << std::endl;
+	 //   std::cout << response.results_size();
             for (int r = 0; r < response.results_size(); ++r) {
                 const auto& result = response.results(r);
-                std::cout << "Result stability: " << result.stability()
-                          << std::endl;
+          //      std::cout << "Result stability: " << result.stability()
+           //               << std::endl;
                 for (int a = 0; a < result.alternatives_size(); ++a) {
                     const auto& alternative = result.alternatives(a);
-                    std::cout << alternative.confidence() << "\t"
-                              << alternative.transcript() << std::endl;
+            //        std::cout << alternative.confidence() << "\t"
+             //                 << alternative.transcript() << std::endl;
                 }
             }
         }
+	std::cout << "READ" << std::endl;
 	read_done = true;
         grpc::Status status = streamer->Finish();
         send_chunks_thread.join();
@@ -161,11 +162,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_accept(beast::error_code ec) {
-        std::cout << "ACCEPT" << std::endl;
 	if (ec) {
             return fail(ec, "accept");
         }
-
+	while(!write_start);
         this->consumer_thread =
             std::thread(&WebsocketSession::process_audio, this);
 
@@ -182,7 +182,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
-        std::cout << bytes_transferred << std::endl;
 	boost::ignore_unused(bytes_transferred);
 
         // This indicates that the WebsocketSession was closed
@@ -206,7 +205,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         auto chunk =
             std::vector<float>(arr, arr + (bytes_transferred / sizeof(float)));
         this->spsc_queue.push(chunk);
-	shared.push(chunk);
+	while(!shared.push(chunk));
 
         this->ws_.async_write(
             this->buffer_.data(),

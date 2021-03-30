@@ -41,11 +41,8 @@ void read_chunks_stdin();
 void read_chunks_websocket();
 void write_thread();
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
-
-
-
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-						      StreamingRecognizeResponse>*);
+						      StreamingRecognizeResponse>* );
 boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>> shared;
 bool read_done = false;
 bool write_start = false;
@@ -88,12 +85,6 @@ int main(int argc, char * argv[]) {
 	std::cout << "Unknown mode" << std::endl;
     } 
 
-    //grpc::Status status = streamer->Finish();
-    /*if (!status.ok()) {
-        // Report the RPC failure.
-        std::cerr << status.error_message() << std::endl;
-	return -1;
-    }*/
 
     return 0;
 }
@@ -166,12 +157,14 @@ void write_thread(){
 	//Write first request with config
 	auto mutable_config = streaming_config->mutable_config();
 	mutable_config->set_language_code("en");
-	mutable_config->set_sample_rate_hertz(44100);
+	mutable_config->set_sample_rate_hertz(48000);
 	mutable_config->set_encoding(RecognitionConfig::LINEAR16);
 	mutable_config->set_max_alternatives(5);
 	streaming_config->set_interim_results(true);
 	streamer->Write(request);
-
+	//Initialize response reader thread
+	//std::thread asr_reader_thread(read_responses, &streamer);
+	
 	handle = smile_new();
 	smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
 	smile_set_log_callback(handle, &log_callback, &builder);
@@ -187,12 +180,12 @@ void write_thread(){
 	while(!read_done){
 		while(shared.pop(chunk)){
 			//Write to opensmile
-			/*while(true){
+			while(true){
 				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
 				if(result == SMILE_SUCCESS){
 					break;
 				}
-			}*/
+			}
 
 			//Convert 32f chunk to 16i chunk
 			std::vector<int16_t> int_chunk;
@@ -213,7 +206,14 @@ void write_thread(){
 	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
 
 	opensmile_thread.join();
-
+	//asr_reader_thread.join();
+	
+	/*grpc::Status status = streamer->Finish();
+	if (!status.ok()) {
+		// Report the RPC failure.
+		std::cerr << status.error_message() << std::endl;
+	}*/
+	
 	StreamingRecognizeResponse response;
 	while (streamer->Read(&response)) {  // Returns false when no more to read.
 	// Dump the transcript of all the results.
