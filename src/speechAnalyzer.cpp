@@ -157,13 +157,13 @@ void write_thread(){
 	//Write first request with config
 	auto mutable_config = streaming_config->mutable_config();
 	mutable_config->set_language_code("en");
-	mutable_config->set_sample_rate_hertz(48000);
+	mutable_config->set_sample_rate_hertz(44100);
 	mutable_config->set_encoding(RecognitionConfig::LINEAR16);
 	mutable_config->set_max_alternatives(5);
 	streaming_config->set_interim_results(true);
 	streamer->Write(request);
 	//Initialize response reader thread
-	//std::thread asr_reader_thread(read_responses, &streamer);
+	std::thread asr_reader_thread(read_responses, streamer.get());
 	
 	handle = smile_new();
 	smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
@@ -203,46 +203,16 @@ void write_thread(){
 	float_sample.close();
         int_sample.close();	
 	streamer->WritesDone();
-	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
-
-	opensmile_thread.join();
-	//asr_reader_thread.join();
-	
-	/*grpc::Status status = streamer->Finish();
+	grpc::Status status = streamer->Finish();
 	if (!status.ok()) {
 		// Report the RPC failure.
 		std::cerr << status.error_message() << std::endl;
-	}*/
-	
-	StreamingRecognizeResponse response;
-	while (streamer->Read(&response)) {  // Returns false when no more to read.
-	// Dump the transcript of all the results.
-		
-	    std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
-	    nlohmann::json j;
-	    j["header"]["timestamp"] = timestamp;
-	    j["header"]["message_type"] = "observation";
-	    j["header"]["version"] = 0.1;
-	    j["msg"]["timestamp"] = timestamp;
-	    j["msg"]["experiment_id"] = nullptr;
-	    j["msg"]["trial_id"] = nullptr;
-	    j["msg"]["version"] = "0.1";
-	    j["msg"]["source"] = "tomcat_speech_analyzer";
-	    j["msg"]["sub_type"] = "speech_analysis";
-	    j["data"]["text"] = response.results(0).alternatives(0).transcript();
-	    j["data"]["is_final"] = response.results(0).is_final();
-	    j["data"]["asr_system"] = "google";
-	    j["data"]["participant_id"] = nullptr;
-	    
-	    std::vector<nlohmann::json> alternatives;
-	    auto result = response.results(0);
-	    for(int i=0; i<result.alternatives_size(); i++){
-		auto alternative = result.alternatives(i); 
-		alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
-	    }
-	    j["data"]["alternatives"] = alternatives;
-	    std::cout << j << std::endl; 
 	}
+	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
+
+	opensmile_thread.join();
+	asr_reader_thread.join();
+	
 }
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,

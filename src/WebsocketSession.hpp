@@ -75,101 +75,14 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
   private:
-    void
-    send_chunks(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-                                                  StreamingRecognizeResponse>*
-                    streamer) {
-        StreamingRecognizeRequest request;
-        std::vector<float> chunk;
-        while (!this->done) {
-            while (this->spsc_queue.pop(&chunk)) {
-                std::vector<int16_t> intVec(chunk.size());
-                for (float f : chunk) {
-                    f = f * 32768;
-                    if (f < -32768) {
-                        f = -32768;
-                    }
-                    if (f > 32767) {
-                        f = 32767;
-                    }
-                    int16_t i = (int16_t)f;
-                    intVec.push_back(i);
-                }
-
-		//Write chunks to google speech api
-//		request.set_audio_content(&intVec[0], intVec.size());
-//                streamer->Write(request);
-            }
-
-        }
-	streamer->WritesDone();
-    }
-
-    int process_audio(void) {
-
-	//Google asr instance
-        auto creds = grpc::GoogleDefaultCredentials();
-        auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
-        std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
-
-        StreamingRecognizeRequest request;
-
-        // Set up the configuration
-        auto* streaming_config = request.mutable_streaming_config();
-        auto* config = streaming_config->mutable_config();
-        config->set_language_code("en");
-        config->set_sample_rate_hertz(48000);
-        config->set_encoding(
-            google::cloud::speech::v1::RecognitionConfig::LINEAR16);
-        streaming_config->set_interim_results(true);
-	grpc::ClientContext context;
-        auto streamer = speech->StreamingRecognize(&context);
-
-        // Write the first request, containing the config only.
-        streaming_config->set_interim_results(true);
-        streamer->Write(request);
-
-        std::thread send_chunks_thread(
-            &WebsocketSession::send_chunks, this, streamer.get());
-
-        StreamingRecognizeResponse response;
-
-        while (streamer->Read(&response)) {
-	//    std::cout << "READ" << std::endl;
-	 //   std::cout << response.results_size();
-            for (int r = 0; r < response.results_size(); ++r) {
-                const auto& result = response.results(r);
-          //      std::cout << "Result stability: " << result.stability()
-           //               << std::endl;
-                for (int a = 0; a < result.alternatives_size(); ++a) {
-                    const auto& alternative = result.alternatives(a);
-            //        std::cout << alternative.confidence() << "\t"
-             //                 << alternative.transcript() << std::endl;
-                }
-            }
-        }
-	std::cout << "READ" << std::endl;
-	read_done = true;
-        grpc::Status status = streamer->Finish();
-        send_chunks_thread.join();
-        if (!status.ok()) {
-            // Report the RPC failure.
-            std::cerr << status.error_message() << std::endl;
-            return -1;
-        }
-
-        return 0;
-    }
 
     void on_accept(beast::error_code ec) {
 	if (ec) {
             return fail(ec, "accept");
         }
 	while(!write_start);
-        this->consumer_thread =
-            std::thread(&WebsocketSession::process_audio, this);
-
-        // Read a message
+        
+	// Read a message
         this->do_read();
     }
 
@@ -186,7 +99,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         // This indicates that the WebsocketSession was closed
         if (ec == ws::error::closed) {
-            this->consumer_thread.join();
+            read_done = true;
             return;
         }
 
@@ -204,7 +117,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         auto chunk =
             std::vector<float>(arr, arr + (bytes_transferred / sizeof(float)));
-        this->spsc_queue.push(chunk);
 	while(!shared.push(chunk));
 
         this->ws_.async_write(
