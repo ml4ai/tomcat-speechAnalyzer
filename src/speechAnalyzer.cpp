@@ -1,5 +1,4 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <boost/program_options.hpp>
 #include <grpc++/grpc++.h>
 #include <regex>
@@ -33,7 +32,7 @@ using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::RecognitionConfig;
-
+using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
 const size_t MAX_NUM_SAMPLES = 512;
 
@@ -42,7 +41,7 @@ void read_chunks_websocket();
 void write_thread();
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-						      StreamingRecognizeResponse>* );
+						      StreamingRecognizeResponse>*);
 boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>> shared;
 bool read_done = false;
 bool write_start = false;
@@ -69,6 +68,7 @@ int main(int argc, char * argv[]) {
 	return -1;
     }
 
+
     if(mode.compare("stdin") == 0){
 	    std::thread thread_object(read_chunks_stdin);
 	    std::thread thread_object2(write_thread);
@@ -84,7 +84,6 @@ int main(int argc, char * argv[]) {
     else{
 	std::cout << "Unknown mode" << std::endl;
     } 
-
 
     return 0;
 }
@@ -160,6 +159,7 @@ void write_thread(){
 	mutable_config->set_sample_rate_hertz(44100);
 	mutable_config->set_encoding(RecognitionConfig::LINEAR16);
 	mutable_config->set_max_alternatives(5);
+	mutable_config->set_enable_word_time_offsets(true);
 	streaming_config->set_interim_results(true);
 	streamer->Write(request);
 	//Initialize response reader thread
@@ -215,8 +215,7 @@ void write_thread(){
 	
 }
 
-void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-						      StreamingRecognizeResponse>* streamer){
+void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer){
     
     StreamingRecognizeResponse response;
     while (streamer->Read(&response)) {  // Returns false when no more to read.
@@ -243,6 +242,20 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 	    for(int i=0; i<result.alternatives_size(); i++){
 		auto alternative = result.alternatives(i); 
 		alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
+	    	for(WordInfo word : alternative.words()){
+			int64_t start_seconds = word.start_time().seconds();
+			int32_t start_nanos = word.start_time().nanos();
+			int64_t end_seconds = word.end_time().seconds();
+			int32_t end_nanos = word.end_time().nanos();
+
+			float start_time = start_seconds + (start_nanos/1000000000.0);
+			float end_time = end_seconds + (end_nanos/1000000000.0);
+
+			std::vector<nlohmann::json> features = builder->features_between(start_time, end_time);
+			for(int x=0;x<features.size();x++){
+				std::cout << features[x] << std::endl;
+			}
+		}
 	    }
 	    j["data"]["alternatives"] = alternatives;
             std::cout << j << std::endl; 
