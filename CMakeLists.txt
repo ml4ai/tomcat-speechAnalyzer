@@ -9,12 +9,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 add_subdirectory(external)
 
 
-find_package(Boost COMPONENTS date_time REQUIRED)
+add_definitions(-DBOOST_LOG_DYN_LINK)
+find_package(Boost COMPONENTS chrono program_options date_time Coroutine Log REQUIRED)
+find_package(range-v3 REQUIRED)
 find_package(nlohmann_json REQUIRED)
+#find_package(Mosquitto REQUIRED)
 
 link_directories(lib/opensmile/build/progsrc/smileapi)
 
-add_executable(speechAnalyzer src/speechAnalyzer.cpp  src/JsonBuilder.cpp src/parse_arguments.cc)
+add_executable(speechAnalyzer src/speechAnalyzer.cpp src/JsonBuilder.cpp)
 
 target_include_directories(speechAnalyzer PUBLIC lib/opensmile/progsrc/include/smileapi)
 target_include_directories(speechAnalyzer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

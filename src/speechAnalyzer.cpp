@@ -1,4 +1,5 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
 #include <grpc++/grpc++.h>
 #include <regex>
@@ -34,6 +35,8 @@ using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
+using namespace boost::chrono;
+
 const size_t MAX_NUM_SAMPLES = 512;
 
 void read_chunks_stdin();
@@ -151,6 +154,7 @@ void write_thread(){
 	StreamingRecognizeRequest request;
 	auto* streaming_config = request.mutable_streaming_config();
 	//Begin a stream
+	process_real_cpu_clock::time_point stream_start = process_real_cpu_clock::now(); // Need to know starting time to restart steram 
 	grpc::ClientContext context;
 	auto streamer = speech->StreamingRecognize(&context);
 	//Write first request with config
@@ -179,6 +183,7 @@ void write_thread(){
 	write_start = true;
 	while(!read_done){
 		while(shared.pop(chunk)){
+			
 			//Write to opensmile
 			while(true){
 				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
@@ -198,6 +203,13 @@ void write_thread(){
 			//Write to google asr service
 			content_request.set_audio_content(&int_chunk[0], int_chunk.size()*sizeof(int16_t));
 			streamer->Write(content_request);
+			
+			//Check if asr stream needs to be restarted
+			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
+			//std::cout << stream_current - stream_start << std::endl;
+			std::cout << time_point_cast<minutes>(stream_current) - time_point_cast<minutes>(stream_start) << std::endl;
+			//	std::cout << "Too long" << std::endl;
+			//}
 		}
 	}
 	float_sample.close();
@@ -261,7 +273,7 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 			a["data"]["start_time"] = start_time;
 			a["data"]["end_time"] = end_time;
 			a["data"]["features"] = features;	
-			std::cout << a << std::endl;
+//			std::cout << a << std::endl;
 		}
 	    }
 	    j["data"]["alternatives"] = alternatives;
