@@ -19,8 +19,8 @@ class JsonBuilder{
                 temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
                 if(tmeta){
                         if(temp.find("lld") != std::string::npos){
-				//this->history.push_back(j);
-                                std::cout << j << std::endl;
+				this->history.push_back(j);
+                                //std::cout << j << std::endl;
                                 tmeta = false;
                                 create_header();
                         }
@@ -47,7 +47,22 @@ class JsonBuilder{
                 }
         }
 
+	// Keep track of previous extractions
+	std::vector<nlohmann::json> history;
+	int history_index = 0;
+	std::vector<nlohmann::json> features_between(float start_time, float end_time){
+		std::vector<nlohmann::json> out;
+		for(int i=0;i<history.size();i++){
+			float time = history[i]["data"]["tmeta"]["time"];
+			if(time > start_time && time < end_time){
+				out.push_back(history[i]["data"]["features"]);
+			}
+		}
+
+		return out;
+	}
         private:
+	
 	bool tmeta = false;
         nlohmann::json j;
 	
@@ -66,19 +81,5 @@ class JsonBuilder{
                 j["msg"]["sub_type"] = "speech_analysis";
         }
 
-	// Keep track of previous extractions
-	std::vector<nlohmann::json> history;
-	int history_index = 0;
-	std::vector<nlohmann::json> features_between(float start_time, float end_time){
-		std::vector<nlohmann::json> out;
-		for(int i=0;i<history.size();i++){
-			float time = history[i]["data"]["tmeta"]["time"];
-			if(time > start_time && time < end_time){
-				out.push_back(history[i]);
-			}
-		}
-
-		return out;
-	}
 
 };

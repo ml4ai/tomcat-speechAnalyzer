@@ -41,7 +41,7 @@ void read_chunks_websocket();
 void write_thread();
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-						      StreamingRecognizeResponse>*);
+						      StreamingRecognizeResponse>*, JsonBuilder* builder);
 boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>> shared;
 bool read_done = false;
 bool write_start = false;
@@ -163,7 +163,7 @@ void write_thread(){
 	streaming_config->set_interim_results(true);
 	streamer->Write(request);
 	//Initialize response reader thread
-	std::thread asr_reader_thread(read_responses, streamer.get());
+	std::thread asr_reader_thread(read_responses, streamer.get(), &builder);
 	
 	handle = smile_new();
 	smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
@@ -215,7 +215,7 @@ void write_thread(){
 	
 }
 
-void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer){
+void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer, JsonBuilder *builder){
     
     StreamingRecognizeResponse response;
     while (streamer->Read(&response)) {  // Returns false when no more to read.
@@ -250,14 +250,21 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 
 			float start_time = start_seconds + (start_nanos/1000000000.0);
 			float end_time = end_seconds + (end_nanos/1000000000.0);
+			std::string current_word = word.word();
 
-			std::vector<nlohmann::json> features = builder->features_between(start_time, end_time);
-			for(int x=0;x<features.size();x++){
-				std::cout << features[x] << std::endl;
-			}
+			std::vector<nlohmann::json> features = builder->features_between( start_time, end_time);
+		
+			nlohmann::json a;
+			a["header"] = j["header"];
+			a["msg"] = j["msg"];
+			a["data"]["word"] = current_word;
+			a["data"]["start_time"] = start_time;
+			a["data"]["end_time"] = end_time;
+			a["data"]["features"] = features;	
+			std::cout << a << std::endl;
 		}
 	    }
 	    j["data"]["alternatives"] = alternatives;
-            std::cout << j << std::endl; 
+            //std::cout << j << std::endl; 
     }
 }
