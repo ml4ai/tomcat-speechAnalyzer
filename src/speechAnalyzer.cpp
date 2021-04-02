@@ -151,8 +151,8 @@ void write_thread(){
 	auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
 	std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
 	//Handle streaming config
-	StreamingRecognizeRequest request;
-	auto* streaming_config = request.mutable_streaming_config();
+	StreamingRecognizeRequest config_request;
+	auto* streaming_config = config_request.mutable_streaming_config();
 	//Begin a stream
 	process_real_cpu_clock::time_point stream_start = process_real_cpu_clock::now(); // Need to know starting time to restart steram 
 	grpc::ClientContext context;
@@ -165,7 +165,7 @@ void write_thread(){
 	mutable_config->set_max_alternatives(5);
 	mutable_config->set_enable_word_time_offsets(true);
 	streaming_config->set_interim_results(true);
-	streamer->Write(request);
+	streamer->Write(config_request);
 	//Initialize response reader thread
 	std::thread asr_reader_thread(read_responses, streamer.get(), &builder);
 	
@@ -206,10 +206,18 @@ void write_thread(){
 			
 			//Check if asr stream needs to be restarted
 			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
-			//std::cout << stream_current - stream_start << std::endl;
-			std::cout << time_point_cast<minutes>(stream_current) - time_point_cast<minutes>(stream_start) << std::endl;
-			//	std::cout << "Too long" << std::endl;
-			//}
+			if(stream_current - stream_start >  minutes{5}){
+				std::cout << "Stopping current stream" << std::endl;
+				//Stop current stream
+				//streamer->WritesDone();
+				//streamer->Finish();
+				//asr_reader_thread.join();
+
+				//Create new stream
+				//streamer = speech->StreamingRecognize(&context);
+				//streamer->Write(config_request);
+				//std::thread asr_reader_thread(read_responses, streamer.get(), &builder);
+			}
 		}
 	}
 	float_sample.close();
