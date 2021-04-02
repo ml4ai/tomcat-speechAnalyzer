@@ -16,6 +16,7 @@
 #include "parse_arguments.h" 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "spsc.h"
+#include "Mosquitto.h"
 
 #include "util.hpp"
 #include "WebsocketSession.hpp"
@@ -213,10 +214,6 @@ void write_thread(){
 				//streamer->Finish();
 				//asr_reader_thread.join();
 
-				//Create new stream
-				//streamer = speech->StreamingRecognize(&context);
-				//streamer->Write(config_request);
-				//std::thread asr_reader_thread(read_responses, streamer.get(), &builder);
 			}
 		}
 	}
@@ -235,8 +232,9 @@ void write_thread(){
 	
 }
 
-void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer, JsonBuilder *builder){
-    
+void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer, JsonBuilder *builder){ 
+    Mosquitto mosquitto_client;
+    mosquitto_client.connect("127.0.0.1", 5556, 1000,1000,1000);
     StreamingRecognizeResponse response;
     while (streamer->Read(&response)) {  // Returns false when no more to read.
     // Dump the transcript of all the results.
@@ -281,10 +279,14 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 			a["data"]["start_time"] = start_time;
 			a["data"]["end_time"] = end_time;
 			a["data"]["features"] = features;	
+    			mosquitto_client.publish("word/feature", a.dump());
 //			std::cout << a << std::endl;
 		}
 	    }
 	    j["data"]["alternatives"] = alternatives;
+    	    mosquitto_client.publish("asr", j.dump());
             //std::cout << j << std::endl; 
     }
+    
+    mosquitto_client.close();
 }
