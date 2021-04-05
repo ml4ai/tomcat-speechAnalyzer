@@ -237,51 +237,6 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
     while (streamer->Read(&response)) {  // Returns false when no more to read.
     // Dump the transcript of all the results.
 	builder->process_asr_message(response);		
-	    /*std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
-	    nlohmann::json j;
-	    j["header"]["timestamp"] = timestamp;
-	    j["header"]["message_type"] = "observation";
-	    j["header"]["version"] = 0.1;
-	    j["msg"]["timestamp"] = timestamp;
-	    j["msg"]["experiment_id"] = nullptr;
-	    j["msg"]["trial_id"] = nullptr;
-	    j["msg"]["version"] = "0.1";
-	    j["msg"]["source"] = "tomcat_speech_analyzer";
-	    j["msg"]["sub_type"] = "speech_analysis";
-	    j["data"]["text"] = response.results(0).alternatives(0).transcript();
-	    j["data"]["is_final"] = response.results(0).is_final();
-	    j["data"]["asr_system"] = "google";
-            j["data"]["participant_id"] = nullptr;
-	    
-	    //std::vector<nlohmann::json> alternatives;
-	    auto result = response.results(0);
-	    for(int i=0; i<result.alternatives_size(); i++){
-		auto alternative = result.alternatives(i); 
-		//alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
-	    	for(WordInfo word : alternative.words()){
-			int64_t start_seconds = word.start_time().seconds();
-			int32_t start_nanos = word.start_time().nanos();
-			int64_t end_seconds = word.end_time().seconds();
-			int32_t end_nanos = word.end_time().nanos();
-
-			float start_time = start_seconds + (start_nanos/1000000000.0);
-			float end_time = end_seconds + (end_nanos/1000000000.0);
-			std::string current_word = word.word();
-
-			std::vector<nlohmann::json> features = builder->features_between( start_time, end_time);
-	
-			nlohmann::json a;
-			a["header"] = j["header"];
-			a["msg"] = j["msg"];
-			a["data"]["word"] = current_word;
-			a["data"]["start_time"] = start_time;
-			a["data"]["end_time"] = end_time;
-			a["data"]["features"] = features;	
-    			mosquitto_client.publish("word/feature", a.dump());
-		}
-	    }
-	    //j["data"]["alternatives"] = alternatives;
-    	    //mosquitto_client.publish("asr", j.dump());*/
-    }
-    
+	builder->process_alignment_message(response);
+    } 
 }

@@ -5,7 +5,8 @@
 #include <string>
 #include "Mosquitto.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-using google::cloud::speech::v1::StreamingRecognizeResponse;
+using google::cloud::speech::v1::WordInfo;
+;using google::cloud::speech::v1::StreamingRecognizeResponse;
 class JsonBuilder{
         
 	//////////////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +19,8 @@ class JsonBuilder{
 		//Close connectino with mosquitto broker
 		this->mosquitto_client.close();
 	}
-        
+	//////////////////////////////////////////////////////////////////////////////////////////
+	
 	void process_message(smilelogmsg_t message){
                 std::string temp(message.text);
                 temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
@@ -81,6 +83,30 @@ class JsonBuilder{
 		nlohmann::json message;
                 message["header"] = create_common_header();
                 message["msg"] = create_common_msg();
+		
+		auto result = response.results(0);
+            	for(int i=0; i<result.alternatives_size(); i++){
+                	auto alternative = result.alternatives(i);
+			for(WordInfo word : alternative.words()){
+				int64_t start_seconds = word.start_time().seconds();
+				int32_t start_nanos = word.start_time().nanos();
+				int64_t end_seconds = word.end_time().seconds();
+				int32_t end_nanos = word.end_time().nanos();
+
+				float start_time = start_seconds + (start_nanos/1000000000.0);
+				float end_time = end_seconds + (end_nanos/1000000000.0);
+				std::string current_word = word.word();
+
+				std::vector<nlohmann::json> features = this->features_between( start_time, end_time);
+
+				nlohmann::json a;
+				message["data"]["word"] = current_word;
+				message["data"]["start_time"] = start_time;
+				message["data"]["end_time"] = end_time;
+				message["data"]["features"] = features;
+				this->mosquitto_client.publish("word/feature", message.dump());
+			}
+            	}
         }
 
 	//////////////////////////////////////////////////////////////////////////////////////////
