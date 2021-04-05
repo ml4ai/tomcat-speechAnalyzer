@@ -1,35 +1,40 @@
+#include <smileapi/SMILEapi.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <string>
-#include "SMILEapi.h"
+#include "Mosquitto.h"
+#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+using google::cloud::speech::v1::StreamingRecognizeResponse;
 class JsonBuilder{
-
-        public:
-        JsonBuilder(){
-                this->j["header"] = {};
-                this->j["msg"] = {};
-                this->j["data"] = {};
-                this->j["data"]["features"]["lld"] = {};
-                this->j["data"]["tmeta"] = {};
-
-        }
-        void process_message(smilelogmsg_t message){
+        
+	//////////////////////////////////////////////////////////////////////////////////////////
+	public:
+	JsonBuilder(){
+		//Setup connection with mosquitto broker
+		this->mosquitto_client.connect("127.0.0.1", 5556, 1000, 1000, 1000);
+	}	
+	~JsonBuilder(){
+		//Close connectino with mosquitto broker
+		this->mosquitto_client.close();
+	}
+        
+	void process_message(smilelogmsg_t message){
                 std::string temp(message.text);
                 temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
                 if(tmeta){
                         if(temp.find("lld") != std::string::npos){
-				this->history.push_back(j);
-                                //std::cout << j << std::endl;
+				this->opensmile_history.push_back(this->opensmile_message);
+                                this->opensmile_message["header"] = create_common_header();
+				this->opensmile_message["msg"] = create_common_msg();
                                 tmeta = false;
-                                create_header();
                         }
                         if(tmeta){
                                 auto equals_index = temp.find('=');
                                 std::string field = temp.substr(0, equals_index);
                                 double value = std::atof(temp.substr(equals_index+1).c_str());
 
-                                this->j["data"]["tmeta"][field] = value;
+                                this->opensmile_message["data"]["tmeta"][field] = value;
                         }
                 }
 
@@ -39,7 +44,7 @@ class JsonBuilder{
                         std::string field = temp.substr(dot_index+1, equals_index-dot_index-1);
                         double value = std::atof(temp.substr(equals_index+1).c_str());
 
-                        this->j["data"]["features"]["lld"][field] = value;
+                        this->opensmile_message["data"]["features"]["lld"][field] = value;
                 }
 
                 if(temp.find("tmeta:") != std::string::npos){
@@ -47,39 +52,81 @@ class JsonBuilder{
                 }
         }
 
-	// Keep track of previous extractions
-	std::vector<nlohmann::json> history;
-	int history_index = 0;
-	std::vector<nlohmann::json> features_between(float start_time, float end_time){
-		std::vector<nlohmann::json> out;
-		for(int i=0;i<history.size();i++){
-			float time = history[i]["data"]["tmeta"]["time"];
-			if(time > start_time && time < end_time){
-				out.push_back(history[i]["data"]["features"]);
-			}
-		}
-
-		return out;
-	}
-        private:
 	
-	bool tmeta = false;
-        nlohmann::json j;
-	
-        void create_header(){
-                std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+        //Data for handling google asr messages
+        void process_asr_message(StreamingRecognizeResponse response){
+                nlohmann::json message;
+                message["header"] = create_common_header();
+                message["msg"] = create_common_msg();
 
-                j["header"]["timestamp"] = timestamp;
-                j["header"]["message_type"] = "observation";
-                j["header"]["version"] = "0.1";
+                message["data"]["text"] = response.results(0).alternatives(0).transcript();
+                message["data"]["is_final"] = response.results(0).is_final();
+                message["data"]["asr_system"] = "google";
+                message["data"]["participant_id"] = nullptr;
 
-                j["msg"]["timestamp"] = timestamp;
-                j["msg"]["experiment_id"] = nullptr;
-                j["msg"]["trial_id"] = nullptr;
-                j["msg"]["version"] = "0.1";
-                j["msg"]["source"] = "tomcat_speech_analyzer";
-                j["msg"]["sub_type"] = "speech_analysis";
+                // Add transcription alternatvies
+                std::vector<nlohmann::json> alternatives;
+                auto result = response.results(0);
+                for(int i=0;i<result.alternatives_size();i++){
+                        auto alternative = result.alternatives(i);
+                        alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
+                }
+                message["data"]["alternatives"] = alternatives;
+		std::cout << message << std::endl;
+                this->mosquitto_client.publish("agent/asr", message.dump());
         }
 
+	//////////////////////////////////////////////////////////////////////////////////////////
+        private:		
+	Mosquitto mosquitto_client;
+
+        //Data for handling opensmile messages
+        nlohmann::json opensmile_message;
+        std::vector<nlohmann::json> opensmile_history;
+        std::vector<nlohmann::json> features_between(float start_time, float end_time){
+                std::vector<nlohmann::json> out;
+                for(int i=0;i<opensmile_history.size();i++){
+                        float time = opensmile_history[i]["data"]["tmeta"]["time"];
+                        if(time > start_time && time < end_time){
+                                out.push_back(opensmile_history[i]["data"]["features"]);
+                        }
+                }
+
+                return out;
+        }
+
+
+        //Data for handling word/feature alignment messages
+        void process_alignment_message(StreamingRecognizeResponse response){
+
+        }
+	
+	//General class data
+	bool tmeta = false;
+	
+        static nlohmann::json create_common_header(){
+		nlohmann::json header;
+                std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+
+                header["timestamp"] = timestamp;
+                header["message_type"] = "observation";
+                header["version"] = "0.1";
+
+		return header;
+        }
+
+	static nlohmann::json create_common_msg(){
+		nlohmann::json message;
+                std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+
+                message["timestamp"] = timestamp;
+                message["experiment_id"] = nullptr;
+                message["trial_id"] = nullptr;
+                message["version"] = "0.1";
+                message["source"] = "tomcat_speech_analyzer";
+                message["sub_type"] = "speech_analysis";
+		
+		return message;
+	}
 
 };

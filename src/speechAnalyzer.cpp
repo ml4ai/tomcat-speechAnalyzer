@@ -233,13 +233,11 @@ void write_thread(){
 }
 
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer, JsonBuilder *builder){ 
-    Mosquitto mosquitto_client;
-    mosquitto_client.connect("127.0.0.1", 5556, 1000,1000,1000);
     StreamingRecognizeResponse response;
     while (streamer->Read(&response)) {  // Returns false when no more to read.
     // Dump the transcript of all the results.
-		
-	    std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
+	builder->process_asr_message(response);		
+	    /*std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
 	    nlohmann::json j;
 	    j["header"]["timestamp"] = timestamp;
 	    j["header"]["message_type"] = "observation";
@@ -255,11 +253,11 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 	    j["data"]["asr_system"] = "google";
             j["data"]["participant_id"] = nullptr;
 	    
-	    std::vector<nlohmann::json> alternatives;
+	    //std::vector<nlohmann::json> alternatives;
 	    auto result = response.results(0);
 	    for(int i=0; i<result.alternatives_size(); i++){
 		auto alternative = result.alternatives(i); 
-		alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
+		//alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
 	    	for(WordInfo word : alternative.words()){
 			int64_t start_seconds = word.start_time().seconds();
 			int32_t start_nanos = word.start_time().nanos();
@@ -271,7 +269,7 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 			std::string current_word = word.word();
 
 			std::vector<nlohmann::json> features = builder->features_between( start_time, end_time);
-		
+	
 			nlohmann::json a;
 			a["header"] = j["header"];
 			a["msg"] = j["msg"];
@@ -280,13 +278,10 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
 			a["data"]["end_time"] = end_time;
 			a["data"]["features"] = features;	
     			mosquitto_client.publish("word/feature", a.dump());
-//			std::cout << a << std::endl;
 		}
 	    }
-	    j["data"]["alternatives"] = alternatives;
-    	    mosquitto_client.publish("asr", j.dump());
-            //std::cout << j << std::endl; 
+	    //j["data"]["alternatives"] = alternatives;
+    	    //mosquitto_client.publish("asr", j.dump());*/
     }
     
-    mosquitto_client.close();
 }
