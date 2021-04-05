@@ -14,13 +14,12 @@
 
 #include "JsonBuilder.cpp"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "parse_arguments.h"
 #include "spsc.h"
 
+#include "util.hpp"
+#include "WebsocketSession.hpp"
 #include "HTTPSession.hpp"
 #include "Listener.hpp"
-#include "WebsocketSession.hpp"
-#include "util.hpp"
 
 namespace beast = boost::beast;
 namespace http = beast::http;

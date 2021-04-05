@@ -7,9 +7,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(Boost COMPONENTS date_time REQUIRED)
+add_definitions(-DBOOST_LOG_DYN_LINK)
+find_package(Boost COMPONENTS date_time chrono program_options Coroutine Log REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(SMILEapi REQUIRED)
+find_package(range-v3 REQUIRED)
 
 add_subdirectory(external)
 
