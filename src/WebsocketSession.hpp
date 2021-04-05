@@ -1,7 +1,7 @@
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "SMILEapi.h"
 #include "spsc.h"
 
+#include <smileapi/SMILEapi.h>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
