@@ -1,4 +1,4 @@
-#include "SMILEapi.h"
+#include <smileapi/SMILEapi.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <iostream>
 #include <nlohmann/json.hpp>

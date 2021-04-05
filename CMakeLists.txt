@@ -9,20 +9,23 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Boost COMPONENTS date_time REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(SMILEapi REQUIRED)
 
-link_directories(lib/opensmile/build/progsrc/smileapi)
+add_subdirectory(external)
 
-add_executable(speechAnalyzer src/speechAnalyzer.cpp  src/JsonBuilder.cpp)
+add_executable(speechAnalyzer src/speechAnalyzer.cpp src/JsonBuilder.cpp)
 
-target_include_directories(speechAnalyzer PUBLIC lib/opensmile/progsrc/include/smileapi)
 target_include_directories(speechAnalyzer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-target_link_libraries(speechAnalyzer SMILEapi)
-target_link_libraries(speechAnalyzer nlohmann_json::nlohmann_json)
-target_link_libraries(speechAnalyzer ${Boost_LIBRARIES})
-target_link_libraries(speechAnalyzer -pthread)
-target_link_libraries(speechAnalyzer google_cloud_speech)
+target_link_libraries(
+    speechAnalyzer 
+    PRIVATE
+    SMILEapi 
+    nlohmann_json::nlohmann_json
+    ${Boost_LIBRARIES}
+    -pthread
+    google_cloud_speech
+)
 
 file(COPY conf/ DESTINATION conf/)
 file(COPY data/test/ DESTINATION data/test/)
-

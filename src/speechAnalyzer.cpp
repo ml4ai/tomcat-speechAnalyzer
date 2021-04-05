@@ -10,9 +10,9 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <smileapi/SMILEapi.h>
 
 #include "JsonBuilder.cpp"
-#include "SMILEapi.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "parse_arguments.h"
 #include "spsc.h"
