@@ -24,6 +24,7 @@ class JsonBuilder{
                 temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
                 if(tmeta){
                         if(temp.find("lld") != std::string::npos){
+				this->mosquitto_client.publish("agent/uaz/speechAnalyzer/vocalicFeatures", opensmile_message.dump());
 				this->opensmile_history.push_back(this->opensmile_message);
                                 this->opensmile_message["header"] = create_common_header();
 				this->opensmile_message["msg"] = create_common_msg();
@@ -72,8 +73,14 @@ class JsonBuilder{
                         alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
                 }
                 message["data"]["alternatives"] = alternatives;
-		std::cout << message << std::endl;
                 this->mosquitto_client.publish("agent/asr", message.dump());
+        }
+
+        //Data for handling word/feature alignment messages
+        void process_alignment_message(StreamingRecognizeResponse response){
+		nlohmann::json message;
+                message["header"] = create_common_header();
+                message["msg"] = create_common_msg();
         }
 
 	//////////////////////////////////////////////////////////////////////////////////////////
@@ -96,10 +103,6 @@ class JsonBuilder{
         }
 
 
-        //Data for handling word/feature alignment messages
-        void process_alignment_message(StreamingRecognizeResponse response){
-
-        }
 	
 	//General class data
 	bool tmeta = false;
