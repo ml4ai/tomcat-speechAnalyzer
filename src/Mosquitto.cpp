@@ -121,8 +121,8 @@ void Mosquitto::connect(const string& address,
                         int trials,
                         int milliseconds_before_retrial) {
     while (!this->running && trials > 0) {
-        cout << "Trying to connect to " << address << ":" << port << "..."
-             << endl;
+        //cout << "Trying to connect to " << address << ":" << port << "..."
+        //     << endl;
         this_thread::sleep_for(chrono::milliseconds(1000));
         int error_code = mosquitto_connect(
             this->mqtt_client, address.c_str(), port, alive_delay);
@@ -135,7 +135,7 @@ void Mosquitto::connect(const string& address,
             }
         }
         else {
-            cout << "Connection established!" << endl;
+            //cout << "Connection established!" << endl;
             this->running = true;
         }
     }
