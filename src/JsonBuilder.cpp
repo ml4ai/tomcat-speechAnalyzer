@@ -96,24 +96,22 @@ class JsonBuilder{
 				int64_t end_seconds = word.end_time().seconds();
 				int32_t end_nanos = word.end_time().nanos();
 
-				float start_time = start_seconds + (start_nanos/1000000000.0);
-				float end_time = end_seconds + (end_nanos/1000000000.0);
+				double start_time = start_seconds + (start_nanos/1000000000.0);
+				double end_time = end_seconds + (end_nanos/1000000000.0);
 				std::string current_word = word.word();
 			
-				//Features history	
-				std::vector<nlohmann::json> features = this->features_between( start_time, end_time);
-				//Initialize features_map
-				std::vector<std::vector<double>> features_map(this->feature_list.size());
+				// Get extracted features message history	
+				std::vector<nlohmann::json> history = this->features_between(start_time, end_time);
+				// Initialize the features output by creating a vector for each feature
 				nlohmann::json features_output;
-				//Load features_map
-				for(nlohmann::json entry : features){
-					for(int i=0;i<this->feature_list.size();i++){
-						features_map[i].push_back(entry[this->feature_list[i]]);
+				for(auto& it : history[0].items()){
+					features_output[it.key()] = std::vector<double>();
+				} 
+				// Load the features output from the history entries
+				for(auto entry : history){
+					for(auto& it : history[0].items()){
+						features_output[it.key()].push_back(entry[it.key()]);
 					}
-				}
-				//Load features_output
-				for(int i=0;i<this->feature_list.size();i++){
-					features_output[feature_list[i]] = features_map[i];;
 				}
 
 				nlohmann::json a;
@@ -134,7 +132,7 @@ class JsonBuilder{
         //Data for handling opensmile messages
         nlohmann::json opensmile_message;
         std::vector<nlohmann::json> opensmile_history;
-        std::vector<nlohmann::json> features_between(float start_time, float end_time){
+        std::vector<nlohmann::json> features_between(double start_time, double end_time){
 		std::vector<nlohmann::json> out;
                 for(int i=0;i<opensmile_history.size();i++){
                         float time = opensmile_history[i]["data"]["tmeta"]["time"];
