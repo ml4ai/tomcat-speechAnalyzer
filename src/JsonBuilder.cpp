@@ -48,6 +48,9 @@ class JsonBuilder{
                         double value = std::atof(temp.substr(equals_index+1).c_str());
 
                         this->opensmile_message["data"]["features"]["lld"][field] = value;
+			if(!std::count(this->feature_list.begin(), this->feature_list.end(), field)){
+				feature_list.push_back(field);	
+			}
                 }
 
                 if(temp.find("tmeta:") != std::string::npos){
@@ -96,14 +99,29 @@ class JsonBuilder{
 				float start_time = start_seconds + (start_nanos/1000000000.0);
 				float end_time = end_seconds + (end_nanos/1000000000.0);
 				std::string current_word = word.word();
-
+			
+				//Features history	
 				std::vector<nlohmann::json> features = this->features_between( start_time, end_time);
+				//Initialize features_map
+				std::vector<std::vector<double>> features_map(this->feature_list.size());
+				nlohmann::json features_output;
+				//Load features_map
+				for(nlohmann::json entry : features){
+					for(int i=0;i<this->feature_list.size();i++){
+						features_map[i].push_back(entry[this->feature_list[i]]);
+					}
+				}
+				//Load features_output
+				for(int i=0;i<this->feature_list.size();i++){
+					features_output[feature_list[i]] = features_map[i];;
+				}
 
 				nlohmann::json a;
 				message["data"]["word"] = current_word;
 				message["data"]["start_time"] = start_time;
 				message["data"]["end_time"] = end_time;
-				message["data"]["features"] = features;
+				message["data"]["features"] = features_output;
+				std::cout << message << std::endl;
 				this->mosquitto_client.publish("word/feature", message.dump());
 			}
             	}
@@ -117,19 +135,17 @@ class JsonBuilder{
         nlohmann::json opensmile_message;
         std::vector<nlohmann::json> opensmile_history;
         std::vector<nlohmann::json> features_between(float start_time, float end_time){
-                std::vector<nlohmann::json> out;
+		std::vector<nlohmann::json> out;
                 for(int i=0;i<opensmile_history.size();i++){
                         float time = opensmile_history[i]["data"]["tmeta"]["time"];
                         if(time > start_time && time < end_time){
-                                out.push_back(opensmile_history[i]["data"]["features"]);
+                                out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
                         }
                 }
 
                 return out;
         }
-
-
-	
+	std::vector<std::string> feature_list;
 	//General class data
 	bool tmeta = false;
 	
