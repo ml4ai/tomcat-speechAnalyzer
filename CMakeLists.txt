@@ -17,7 +17,7 @@ find_package(Mosquitto REQUIRED)
 
 link_directories(lib/opensmile/build/progsrc/smileapi)
 
-add_executable(speechAnalyzer src/speechAnalyzer.cpp src/JsonBuilder.cpp src/Mosquitto.cpp)
+add_executable(speechAnalyzer src/speechAnalyzer.cpp src/JsonBuilder.cpp src/Mosquitto.cpp src/SpeechWrapper.cpp)
 
 target_include_directories(speechAnalyzer PUBLIC lib/opensmile/progsrc/include/smileapi)
 target_include_directories(speechAnalyzer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

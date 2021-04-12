@@ -119,7 +119,6 @@ class JsonBuilder{
 				message["data"]["start_time"] = start_time;
 				message["data"]["end_time"] = end_time;
 				message["data"]["features"] = features_output;
-				std::cout << message << std::endl;
 				this->mosquitto_client.publish("word/feature", message.dump());
 			}
             	}
