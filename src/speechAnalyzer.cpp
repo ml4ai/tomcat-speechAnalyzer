@@ -13,6 +13,7 @@
 
 #include "SMILEapi.h"
 #include "JsonBuilder.cpp"
+#include "SpeechWrapper.cpp"
 #include "parse_arguments.h" 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "spsc.h"
@@ -147,29 +148,14 @@ void write_thread(){
 	//Initialize and start opensmile
 	smileobj_t* handle;
 
-	//Create a Speech Stub connected to speech service
-	auto creds = grpc::GoogleDefaultCredentials();
-	auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
-	std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
-	//Handle streaming config
-	StreamingRecognizeRequest config_request;
-	auto* streaming_config = config_request.mutable_streaming_config();
-	//Begin a stream
+	//Start speech streamer
+	SpeechWrapper *speech_handler = new SpeechWrapper();
+	speech_handler->start_stream();
 	process_real_cpu_clock::time_point stream_start = process_real_cpu_clock::now(); // Need to know starting time to restart steram 
-	grpc::ClientContext context;
-	auto streamer = speech->StreamingRecognize(&context);
-	//Write first request with config
-	auto mutable_config = streaming_config->mutable_config();
-	mutable_config->set_language_code("en");
-	mutable_config->set_sample_rate_hertz(44100);
-	mutable_config->set_encoding(RecognitionConfig::LINEAR16);
-	mutable_config->set_max_alternatives(5);
-	mutable_config->set_enable_word_time_offsets(true);
-	streaming_config->set_interim_results(true);
-	streamer->Write(config_request);
 	//Initialize response reader thread
-	std::thread asr_reader_thread(read_responses, streamer.get(), &builder);
+	std::thread asr_reader_thread(read_responses, speech_handler->streamer.get(), &builder);
 	
+
 	handle = smile_new();
 	smile_initialize(handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
 	smile_set_log_callback(handle, &log_callback, &builder);
@@ -184,7 +170,6 @@ void write_thread(){
 	write_start = true;
 	while(!read_done){
 		while(shared.pop(chunk)){
-			
 			//Write to opensmile
 			while(true){
 				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
@@ -192,7 +177,6 @@ void write_thread(){
 					break;
 				}
 			}
-
 			//Convert 32f chunk to 16i chunk
 			std::vector<int16_t> int_chunk;
 			for(float f : chunk){
@@ -202,29 +186,25 @@ void write_thread(){
 			int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
 			
 			//Write to google asr service
-			content_request.set_audio_content(&int_chunk[0], int_chunk.size()*sizeof(int16_t));
-			streamer->Write(content_request);
+			speech_handler->send_chunk(int_chunk);
 			
 			//Check if asr stream needs to be restarted
 			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
-			if(stream_current - stream_start >  minutes{5}){
+			if(stream_current - stream_start >  seconds{1}){
 				std::cout << "Stopping current stream" << std::endl;
-				//Stop current stream
-				//streamer->WritesDone();
-				//streamer->Finish();
-				//asr_reader_thread.join();
-
+				speech_handler->finish_stream();	
+				speech_handler = new SpeechWrapper();
+				stream_start = process_real_cpu_clock::now();
+				asr_reader_thread.join();
+				asr_reader_thread = std::thread(read_responses, speech_handler->streamer.get(), &builder);
+				std::cout << "Stream restarted" << std::endl;
 			}
 		}
 	}
 	float_sample.close();
-        int_sample.close();	
-	streamer->WritesDone();
-	grpc::Status status = streamer->Finish();
-	if (!status.ok()) {
-		// Report the RPC failure.
-		std::cerr << status.error_message() << std::endl;
-	}
+        int_sample.close();
+	
+	speech_handler->finish_stream();	
 	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
 
 	opensmile_thread.join();
@@ -238,5 +218,5 @@ void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
     // Dump the transcript of all the results.
 	builder->process_asr_message(response);		
 	builder->process_alignment_message(response);
-    } 
+    }
 }
