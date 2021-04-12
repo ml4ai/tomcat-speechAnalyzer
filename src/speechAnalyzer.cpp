@@ -149,7 +149,7 @@ void write_thread(){
 	smileobj_t* handle;
 
 	//Start speech streamer
-	SpeechWrapper *speech_handler = new SpeechWrapper();
+	SpeechWrapper *speech_handler = new SpeechWrapper(false);
 	speech_handler->start_stream();
 	process_real_cpu_clock::time_point stream_start = process_real_cpu_clock::now(); // Need to know starting time to restart steram 
 	//Initialize response reader thread
@@ -190,25 +190,28 @@ void write_thread(){
 			
 			//Check if asr stream needs to be restarted
 			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
-			if(stream_current - stream_start >  seconds{1}){
-				std::cout << "Stopping current stream" << std::endl;
-				speech_handler->finish_stream();	
-				speech_handler = new SpeechWrapper();
-				stream_start = process_real_cpu_clock::now();
+			if(stream_current - stream_start >  seconds{10}){
+				std::cout << "STOP" << std::endl;
+				speech_handler->send_writes_done();
 				asr_reader_thread.join();
+				speech_handler->finish_stream();	
+				speech_handler = new SpeechWrapper(false);
+				speech_handler->start_stream();
 				asr_reader_thread = std::thread(read_responses, speech_handler->streamer.get(), &builder);
-				std::cout << "Stream restarted" << std::endl;
+				stream_start = process_real_cpu_clock::now();
+				std::cout << "START" << std::endl;
 			}
 		}
 	}
 	float_sample.close();
         int_sample.close();
 	
+	speech_handler->send_writes_done();
+	asr_reader_thread.join();
 	speech_handler->finish_stream();	
 	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
 
 	opensmile_thread.join();
-	asr_reader_thread.join();
 	
 }
 

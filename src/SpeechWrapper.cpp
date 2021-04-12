@@ -1,16 +1,14 @@
 #include <grpc++/grpc++.h>
-#include <boost/chrono.hpp>
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::RecognitionConfig;
-using namespace boost::chrono;
 class SpeechWrapper{
 	
 	public:
-	SpeechWrapper(){
-	
+	SpeechWrapper(bool dummy_read){
+		this->dummy_read = dummy_read;
 	}
 	~SpeechWrapper(){
 
@@ -20,43 +18,43 @@ class SpeechWrapper{
 		send_config();
 	}
 	void finish_stream(){
-		streamer->WritesDone();
+		//Read responses if dummy_read
+		if(dummy_read){	
+			StreamingRecognizeResponse response;
+    			while (streamer->Read(&response));
+		}	
+		
+		//Finish stream
 		status = streamer->Finish();
 		if (!status.ok()) {
-                // Report the RPC failure.
+                	// Report the RPC failure.
 	        	std::cerr << status.error_message() << std::endl;
 		}
-	}
-	void reset_stream(){
-
 	}
 	void send_chunk(std::vector<int16_t> int_chunk){
 		StreamingRecognizeRequest content_request;
 		content_request.set_audio_content(&int_chunk[0], int_chunk.size()*sizeof(int16_t));
 		streamer->Write(content_request);
 	}
-		
+	void send_writes_done(){
+		streamer->WritesDone();
+	}	
 	//Speech session variables
-	grpc::ClientContext context;
 	std::unique_ptr<grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>> streamer;
 	grpc::Status status;
-	
+	grpc::ClientContext context;
 
 	private:
-	//Time variables
-	process_real_cpu_clock::time_point stream_start;
-
+	bool dummy_read = false;
+	bool finished = false;
 	void initialize_stream(){
 		//Create speech stub
 		auto creds = grpc::GoogleDefaultCredentials();
 		auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
 		std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
-
+		
 		//Start stream
 		streamer = speech->StreamingRecognize(&context);		
-
-		//Set start time
-		stream_start = process_real_cpu_clock::now();
 	}
 	void send_config(){
 		//Write first request with config
