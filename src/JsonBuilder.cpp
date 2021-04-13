@@ -96,25 +96,29 @@ class JsonBuilder{
 				int64_t end_seconds = word.end_time().seconds();
 				int32_t end_nanos = word.end_time().nanos();
 
-				double start_time = start_seconds + (start_nanos/1000000000.0);
-				double end_time = end_seconds + (end_nanos/1000000000.0);
+				double start_time = this->sync_time + start_seconds + (start_nanos/1000000000.0);
+				double end_time = this->sync_time + end_seconds + (end_nanos/1000000000.0);
+				std::cout << start_time << std::endl;
+				std::cout << end_time << std::endl;
 				std::string current_word = word.word();
-			
 				// Get extracted features message history	
 				std::vector<nlohmann::json> history = this->features_between(start_time, end_time);
 				// Initialize the features output by creating a vector for each feature
 				nlohmann::json features_output;
-				for(auto& it : history[0].items()){
-					features_output[it.key()] = std::vector<double>();
-				} 
-				// Load the features output from the history entries
-				for(auto entry : history){
+				if(history.size() == 0){
+					features_output = nullptr;
+				}
+				else{
 					for(auto& it : history[0].items()){
-						features_output[it.key()].push_back(entry[it.key()]);
+						features_output[it.key()] = std::vector<double>();
+					} 
+					// Load the features output from the history entries
+					for(auto entry : history){
+						for(auto& it : history[0].items()){
+							features_output[it.key()].push_back(entry[it.key()]);
+						}
 					}
 				}
-
-				nlohmann::json a;
 				message["data"]["word"] = current_word;
 				message["data"]["start_time"] = start_time;
 				message["data"]["end_time"] = end_time;
@@ -124,12 +128,17 @@ class JsonBuilder{
             	}
         }
 
+	void update_sync_time(double sync_time){
+		this->sync_time = sync_time;
+	}
 	//////////////////////////////////////////////////////////////////////////////////////////
         private:		
 	Mosquitto mosquitto_client;
 
         //Data for handling opensmile messages
         nlohmann::json opensmile_message;
+	double sync_time = 0.0;
+	double last_end_time = -1.0;
         std::vector<nlohmann::json> opensmile_history;
         std::vector<nlohmann::json> features_between(double start_time, double end_time){
 		std::vector<nlohmann::json> out;

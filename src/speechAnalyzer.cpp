@@ -142,6 +142,9 @@ void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
 }
 
 void write_thread(){
+	int sample_rate = 44100;
+	int samples_done = 0;
+
 	//JsonBuilder object which will be passed to openSMILE log callback
 	JsonBuilder builder;
 
@@ -170,6 +173,7 @@ void write_thread(){
 	write_start = true;
 	while(!read_done){
 		while(shared.pop(chunk)){
+			samples_done += 1024;
 			//Write to opensmile
 			while(true){
 				smileres_t result = smile_extaudiosource_write_data(handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
@@ -190,16 +194,21 @@ void write_thread(){
 			
 			//Check if asr stream needs to be restarted
 			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
-			if(stream_current - stream_start >  seconds{10}){
-				std::cout << "STOP" << std::endl;
+			if(stream_current - stream_start >  seconds{3}){
+				//Send writes_done and finish reading responses
 				speech_handler->send_writes_done();
 				asr_reader_thread.join();
-				speech_handler->finish_stream();	
+				//End the stream
+				speech_handler->finish_stream();
+				//Sync Opensmile time
+				double sync_time = (double)samples_done/sample_rate;
+				builder.update_sync_time(sync_time);
+				//Create new stream
 				speech_handler = new SpeechWrapper(false);
 				speech_handler->start_stream();
+				//Restart response reader thread
 				asr_reader_thread = std::thread(read_responses, speech_handler->streamer.get(), &builder);
 				stream_start = process_real_cpu_clock::now();
-				std::cout << "START" << std::endl;
 			}
 		}
 	}
