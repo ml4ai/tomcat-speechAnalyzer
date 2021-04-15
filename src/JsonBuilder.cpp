@@ -1,12 +1,17 @@
 #include <smileapi/SMILEapi.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <string>
+#include "version.h"
 #include "Mosquitto.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 using google::cloud::speech::v1::WordInfo;
-;using google::cloud::speech::v1::StreamingRecognizeResponse;
+using google::cloud::speech::v1::StreamingRecognizeResponse;
+
 class JsonBuilder{
         
 	//////////////////////////////////////////////////////////////////////////////////////////
@@ -60,7 +65,7 @@ class JsonBuilder{
 
 	
         //Data for handling google asr messages
-        void process_asr_message(StreamingRecognizeResponse response){
+        void process_asr_message(StreamingRecognizeResponse response, std::string id){
                 nlohmann::json message;
                 message["header"] = create_common_header();
                 message["msg"] = create_common_msg();
@@ -69,8 +74,9 @@ class JsonBuilder{
                 message["data"]["is_final"] = response.results(0).is_final();
                 message["data"]["asr_system"] = "google";
                 message["data"]["participant_id"] = nullptr;
-
-                // Add transcription alternatvies
+		message["data"]["id"] = id;
+                
+		// Add transcription alternatvies
                 std::vector<nlohmann::json> alternatives;
                 auto result = response.results(0);
                 for(int i=0;i<result.alternatives_size();i++){
@@ -79,10 +85,10 @@ class JsonBuilder{
                 }
                 message["data"]["alternatives"] = alternatives;
                 this->mosquitto_client.publish("agent/asr", message.dump());
-        }
+	}
 
         //Data for handling word/feature alignment messages
-        void process_alignment_message(StreamingRecognizeResponse response){
+        void process_alignment_message(StreamingRecognizeResponse response, std::string id){
 		nlohmann::json message;
                 message["header"] = create_common_header();
                 message["msg"] = create_common_msg();
@@ -98,8 +104,6 @@ class JsonBuilder{
 
 				double start_time = this->sync_time + start_seconds + (start_nanos/1000000000.0);
 				double end_time = this->sync_time + end_seconds + (end_nanos/1000000000.0);
-				std::cout << start_time << std::endl;
-				std::cout << end_time << std::endl;
 				std::string current_word = word.word();
 				// Get extracted features message history	
 				std::vector<nlohmann::json> history = this->features_between(start_time, end_time);
@@ -123,7 +127,10 @@ class JsonBuilder{
 				message["data"]["start_time"] = start_time;
 				message["data"]["end_time"] = end_time;
 				message["data"]["features"] = features_output;
+				message["data"]["configuration"] = std::string(GIT_COMMIT);
+				message["data"]["id"] = id;
 				this->mosquitto_client.publish("word/feature", message.dump());
+				std::cout << message.dump() << std::endl;
 			}
             	}
         }
@@ -137,8 +144,9 @@ class JsonBuilder{
 
         //Data for handling opensmile messages
         nlohmann::json opensmile_message;
+	std::vector<std::string> feature_list;
+	bool tmeta = false;
 	double sync_time = 0.0;
-	double last_end_time = -1.0;
         std::vector<nlohmann::json> opensmile_history;
         std::vector<nlohmann::json> features_between(double start_time, double end_time){
 		std::vector<nlohmann::json> out;
@@ -151,10 +159,9 @@ class JsonBuilder{
 
                 return out;
         }
-	std::vector<std::string> feature_list;
-	//General class data
-	bool tmeta = false;
 	
+
+	//Static methods for creating common message types	
         static nlohmann::json create_common_header(){
 		nlohmann::json header;
                 std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";

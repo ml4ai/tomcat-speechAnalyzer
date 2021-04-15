@@ -5,6 +5,26 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+#Process git version information
+#-------------------------------------------------------------------
+execute_process(COMMAND git rev-parse HEAD
+		OUTPUT_VARIABLE GIT_COMMIT
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_QUIET)
+
+set(VERSION "const char* GIT_COMMIT=\"${GIT_COMMIT}\";")
+string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp)
+	file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp VERSION_)
+else()
+	set(VERSION_ "")
+endif()
+
+if (NOT "${VERSION}" STREQUAL "${VERSION_}")
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp "${VERSION}")
+endif()
+#-------------------------------------------------------------------
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 add_subdirectory(external)
 
@@ -17,7 +37,7 @@ find_package(Mosquitto REQUIRED)
 
 link_directories(lib/opensmile/build/progsrc/smileapi)
 
-add_executable(speechAnalyzer src/speechAnalyzer.cpp src/JsonBuilder.cpp src/Mosquitto.cpp src/SpeechWrapper.cpp)
+add_executable(speechAnalyzer src/speechAnalyzer.cpp src/JsonBuilder.cpp src/Mosquitto.cpp src/SpeechWrapper.cpp src/version.cpp)
 
 target_include_directories(speechAnalyzer PUBLIC lib/opensmile/progsrc/include/smileapi)
 target_include_directories(speechAnalyzer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

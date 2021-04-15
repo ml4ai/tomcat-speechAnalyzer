@@ -1,6 +1,9 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include <grpc++/grpc++.h>
 #include <regex>
 #include <string>
@@ -194,7 +197,7 @@ void write_thread(){
 			
 			//Check if asr stream needs to be restarted
 			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
-			if(stream_current - stream_start >  seconds{3}){
+			if(stream_current - stream_start >  seconds{500}){
 				//Send writes_done and finish reading responses
 				speech_handler->send_writes_done();
 				asr_reader_thread.join();
@@ -227,8 +230,10 @@ void write_thread(){
 void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer, JsonBuilder *builder){ 
     StreamingRecognizeResponse response;
     while (streamer->Read(&response)) {  // Returns false when no more to read.
-    // Dump the transcript of all the results.
-	builder->process_asr_message(response);		
-	builder->process_alignment_message(response);
+    	//Generate UUID4 for messages
+	std::string id = boost::uuids::to_string(boost::uuids::random_generator()()); 
+	//Process messages
+	builder->process_asr_message(response, id);		
+	builder->process_alignment_message(response, id);
     }
 }
