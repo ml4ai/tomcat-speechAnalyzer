@@ -28,6 +28,7 @@ class JsonBuilder{
 	
 	void process_message(smilelogmsg_t message){
                 std::string temp(message.text);
+		std::cout << temp << std::endl;
                 temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
                 if(tmeta){
                         if(temp.find("lld") != std::string::npos){
@@ -40,8 +41,7 @@ class JsonBuilder{
                         if(tmeta){
                                 auto equals_index = temp.find('=');
                                 std::string field = temp.substr(0, equals_index);
-                                double value = std::atof(temp.substr(equals_index+1).c_str());
-
+                                double value = std::atof(temp.substr(equals_index+1).c_str());	
                                 this->opensmile_message["data"]["tmeta"][field] = value;
                         }
                 }
@@ -129,8 +129,8 @@ class JsonBuilder{
 				message["data"]["features"] = features_output;
 				message["data"]["configuration"] = std::string(GIT_COMMIT);
 				message["data"]["id"] = id;
+				message["data"]["time_interval"] = 0.01;
 				this->mosquitto_client.publish("word/feature", message.dump());
-				std::cout << message.dump() << std::endl;
 			}
             	}
         }

@@ -42,8 +42,6 @@ using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
 using namespace boost::chrono;
 
-const size_t MAX_NUM_SAMPLES = 512;
-
 void read_chunks_stdin();
 void read_chunks_websocket();
 void write_thread();
@@ -169,8 +167,8 @@ void write_thread(){
 	//Initialize opensmile thread
 	std::thread opensmile_thread(smile_run, handle);
 	
-	ofstream float_sample("float_sample", std::ios::out | std::ios::binary | std::ios::app);
-        ofstream int_sample("int_sample", std::ios::out | std::ios::binary | std::ios::app);	
+	ofstream float_sample("float_sample", std::ios::out | std::ios::binary | std::ios::trunc);
+        ofstream int_sample("int_sample", std::ios::out | std::ios::binary | std::ios::trunc);	
 	StreamingRecognizeRequest content_request;
 	std::vector<float> chunk(1024);
 	write_start = true;
