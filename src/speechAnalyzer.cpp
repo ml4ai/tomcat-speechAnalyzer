@@ -14,13 +14,15 @@
 #include <vector>
 #include <fstream>
 
-#include "SMILEapi.h"
-#include "JsonBuilder.cpp"
+#include <smileapi/SMILEapi.h>
+//#include "SMILEapi.h"
+//#include "JsonBuilder.cpp"
 #include "SpeechWrapper.cpp"
 #include "parse_arguments.h" 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "spsc.h"
 #include "Mosquitto.h"
+#include "helper.h"
 
 #include "util.hpp"
 #include "WebsocketSession.hpp"
@@ -83,9 +85,9 @@ int main(int argc, char * argv[]) {
     }
     else if(mode.compare("websocket") == 0){
 	    std::thread thread_object(read_chunks_websocket);
-	    std::thread thread_object2(write_thread);
+	    //std::thread thread_object2(write_thread);
 	    thread_object.join();
-	    thread_object2.join();
+	    //thread_object2.join();
     }
     else{
 	std::cout << "Unknown mode" << std::endl;
@@ -111,7 +113,7 @@ void read_chunks_websocket(){
 	auto const address = asio::ip::make_address("127.0.0.1");
 	auto const port = static_cast<unsigned short>(8888);
 	auto const doc_root = make_shared<std::string>(".");
-	auto const n_threads = 4;
+	auto const n_threads = 1;
 
 	asio::io_context ioc{n_threads};
 
@@ -135,13 +137,6 @@ void read_chunks_websocket(){
 	}
 }
 
-void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param){
-
-	
-	JsonBuilder *builder = (JsonBuilder*)(param);
-	builder->process_message(message);
-}
-
 void write_thread(){
 	int sample_rate = 44100;
 	int samples_done = 0;
@@ -157,7 +152,7 @@ void write_thread(){
 	speech_handler->start_stream();
 	process_real_cpu_clock::time_point stream_start = process_real_cpu_clock::now(); // Need to know starting time to restart steram 
 	//Initialize response reader thread
-	std::thread asr_reader_thread(read_responses, speech_handler->streamer.get(), &builder);
+	std::thread asr_reader_thread(process_responses, speech_handler->streamer.get(), &builder);
 	
 
 	handle = smile_new();
@@ -208,7 +203,7 @@ void write_thread(){
 				speech_handler = new SpeechWrapper(false);
 				speech_handler->start_stream();
 				//Restart response reader thread
-				asr_reader_thread = std::thread(read_responses, speech_handler->streamer.get(), &builder);
+				asr_reader_thread = std::thread(process_responses, speech_handler->streamer.get(), &builder);
 				stream_start = process_real_cpu_clock::now();
 			}
 		}
@@ -225,13 +220,3 @@ void write_thread(){
 	
 }
 
-void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest, StreamingRecognizeResponse>* streamer, JsonBuilder *builder){ 
-    StreamingRecognizeResponse response;
-    while (streamer->Read(&response)) {  // Returns false when no more to read.
-    	//Generate UUID4 for messages
-	std::string id = boost::uuids::to_string(boost::uuids::random_generator()()); 
-	//Process messages
-	builder->process_asr_message(response, id);		
-	builder->process_alignment_message(response, id);
-    }
-}
