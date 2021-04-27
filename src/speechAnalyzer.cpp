@@ -14,11 +14,9 @@
 #include <vector>
 #include <fstream>
 
-#include <smileapi/SMILEapi.h>
-//#include "SMILEapi.h"
-//#include "JsonBuilder.cpp"
+#include "SMILEapi.h"
+#include "JsonBuilder.hpp"
 #include "SpeechWrapper.cpp"
-#include "parse_arguments.h" 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "spsc.h"
 #include "Mosquitto.h"
@@ -43,16 +41,13 @@ using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
 using namespace boost::chrono;
-
 void read_chunks_stdin();
 void read_chunks_websocket();
 void write_thread();
-void log_callback(smileobj_t*, smilelogmsg_t, void*);
-void read_responses(grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-						      StreamingRecognizeResponse>*, JsonBuilder* builder);
 boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>> shared;
 bool read_done = false;
 bool write_start = false;
+
 
 int main(int argc, char * argv[]) {
     std::string mode;
@@ -110,7 +105,8 @@ void read_chunks_stdin(){
 }
 
 void read_chunks_websocket(){
-	auto const address = asio::ip::make_address("127.0.0.1");
+	std::cout << "Starting Websocket Server" << std::endl;
+	auto const address = asio::ip::make_address("0.0.0.0");
 	auto const port = static_cast<unsigned short>(8888);
 	auto const doc_root = make_shared<std::string>(".");
 	auto const n_threads = 1;
@@ -140,10 +136,10 @@ void read_chunks_websocket(){
 void write_thread(){
 	int sample_rate = 44100;
 	int samples_done = 0;
-
+	
 	//JsonBuilder object which will be passed to openSMILE log callback
 	JsonBuilder builder;
-
+	
 	//Initialize and start opensmile
 	smileobj_t* handle;
 

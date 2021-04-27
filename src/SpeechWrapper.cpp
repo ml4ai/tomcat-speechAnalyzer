@@ -63,7 +63,7 @@ class SpeechWrapper{
 
 		auto mutable_config = streaming_config->mutable_config();
 		mutable_config->set_language_code("en");
-		mutable_config->set_sample_rate_hertz(44100);
+		mutable_config->set_sample_rate_hertz(48000);
 		mutable_config->set_encoding(RecognitionConfig::LINEAR16);
 		mutable_config->set_max_alternatives(5);
 		mutable_config->set_enable_word_time_offsets(true);

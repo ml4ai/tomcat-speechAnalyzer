@@ -1,12 +1,10 @@
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-//#include "SMILEapi.h"
+#include "SMILEapi.h"
 #include "helper.h"
-
-#include <smileapi/SMILEapi.h>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
-#include <boost/log/trivial.hpp>
+//#include <boost/log/trivial.hpp>
 #include <grpc++/grpc++.h>
 #include <range/v3/all.hpp>
 #include <thread>
@@ -26,8 +24,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     ws::stream<beast::tcp_stream> ws_;
     beast::flat_buffer buffer_;
-    boost::lockfree::spsc_queue<std::vector<float>,
-                                boost::lockfree::capacity<1024>>
+    boost::lockfree::spsc_queue<std::vector<int16_t>,
+                                boost::lockfree::capacity<4096>>
         spsc_queue;
 
     std::atomic<bool> done{false};
@@ -66,8 +64,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             params[key_value_pair[0]] = key_value_pair[1];
         }
 
-        BOOST_LOG_TRIVIAL(debug) << "Id: " << params["id"]
-                                 << ", sampleRate: " << params["sampleRate"];
+//        BOOST_LOG_TRIVIAL(debug) << "Id: " << params["id"]
+//                                 << ", sampleRate: " << params["sampleRate"];
 
 	this->participant_id = params["id"];
 
@@ -98,30 +96,13 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     	ofstream float_sample("float_sample_" + this->participant_id , std::ios::out | std::ios::binary | std::ios::trunc);
         ofstream int_sample("int_sample_" + this->participant_id, std::ios::out | std::ios::binary | std::ios::trunc);
         StreamingRecognizeRequest content_request;
-        std::vector<float> chunk(1024);
+        std::vector<int16_t> chunk(4096);
 	while(!this->read_done){
 		while(spsc_queue.pop(chunk)){
-			this->samples_done += 1024;
-
-			//Write to openSMILE
-			while(true){
-				smileres_t result = smile_extaudiosource_write_data(this->handle, "externalAudioSource", (void*)&chunk[0], chunk.size()*sizeof(float));
-				if(result == SMILE_SUCCESS){
-					break;
-				}
-			}
-
-			//Convert 32f chunk to 16i chunk
-			std::vector<int16_t> int_chunk;
-			for(float f : chunk){
-				int_chunk.push_back((int16_t)(f*32768));
-			}
-			float_sample.write((char *)&chunk[0], sizeof(float)*chunk.size());
-			int_sample.write((char *)&int_chunk[0], sizeof(int16_t)*int_chunk.size());
-
+			this->samples_done += 4096;
+			
 			//Write to google asr service
-			this->speech_handler->send_chunk(int_chunk);
-
+			this->speech_handler->send_chunk(chunk);
 			//Check if asr stream needs to be restarted
 			process_real_cpu_clock::time_point stream_current = process_real_cpu_clock::now();
 			if(stream_current - this->stream_start >  minutes{4}){
@@ -140,9 +121,27 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 				this->asr_reader_thread = std::thread(process_responses, this->speech_handler->streamer.get(), &(this->builder));
 				this->stream_start = process_real_cpu_clock::now();
 			}
+
+			//Convert 16i chunk to 32f chunk
+			std::vector<float> float_chunk;
+			for(int i : chunk){
+				//int_chunk.push_back((int16_t)(f*32768));
+				float_chunk.push_back((float)(i/32768.0));
+			}
+			float_sample.write((char *)&float_chunk[0], sizeof(float)*float_chunk.size());
+			int_sample.write((char *)&chunk[0], sizeof(int16_t)*chunk.size());
+			
+			//Write to openSMILE
+			while(true){
+				smileres_t result = smile_extaudiosource_write_data(this->handle, "externalAudioSource", (void*)&chunk[0], float_chunk.size()*sizeof(float));
+				if(result == SMILE_SUCCESS){
+					break;
+				}
+			}
+
+
 		}
 	}
-	std::cout << "DONE " << std::endl;
 	float_sample.close();
 	int_sample.close();
 	
@@ -159,7 +158,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	if (ec) {
             return fail(ec, "accept");
         }
-	
+
+	std::cout << "Accepted connection" << std::endl;	
 	//Initialize openSMILE 
 	this->handle = smile_new();
 	smile_initialize(this->handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
@@ -204,20 +204,20 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         // Echo the message
         this->ws_.text(this->ws_.got_text());
-
-        float* arr = new float[bytes_transferred / sizeof(float)];
+	std::cout << bytes_transferred << std::endl;
+        int16_t* arr = new int16_t[bytes_transferred / sizeof(int16_t)];
         boost::asio::buffer_copy(boost::asio::buffer(arr, bytes_transferred),
                                  this->buffer_.data(),
                                  bytes_transferred);
 
         auto chunk =
-            std::vector<float>(arr, arr + (bytes_transferred / sizeof(float)));
+            std::vector<int16_t>(arr, arr + (bytes_transferred / sizeof(int16_t)));
 	while(!this->spsc_queue.push(chunk));
-
+	
 	//Set read_start
 	if(!this->read_start){
 		this->read_start = true;
-	}	
+	}
         this->ws_.async_write(
             this->buffer_.data(),
             beast::bind_front_handler(&WebsocketSession::on_write,
@@ -225,15 +225,13 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_write(beast::error_code ec, size_t bytes_transferred) {
-        boost::ignore_unused(bytes_transferred);
-
+	boost::ignore_unused(bytes_transferred);	
         if (ec) {
             return fail(ec, "write");
         }
 
         // Clear the buffer
         this->buffer_.consume(buffer_.size());
-
         // Do another read
         this->do_read();
     }

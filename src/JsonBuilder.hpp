@@ -1,16 +1,17 @@
 #pragma once
 
-#include <smileapi/SMILEapi.h>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <nlohmann/json.hpp>
 #include <iostream>
+#include <thread>
 #include <string>
 #include "version.h"
 #include "Mosquitto.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "SMILEapi.h"
 using google::cloud::speech::v1::WordInfo;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 
@@ -20,15 +21,20 @@ class JsonBuilder{
 	public:
 	JsonBuilder(){
 		//Setup connection with mosquitto broker
-		this->mosquitto_client.connect("127.0.0.1", 5556, 1000, 1000, 1000);
-		this->listener_client.connect("127.0.0.1", 5556, 1000, 1000, 1000);
+		this->mosquitto_client.connect("mosquitto", 1883, 1000, 1000, 1000);
+	/*	this->listener_client.connect("127.0.0.1", 5556, 1000, 1000, 1000);
 		//Listen for trial id and experiment id
 		this->listener_client.subscribe("trial");
 		this->listener_client.subscribe("experiment");
-	}	
+		this->listener_client_thread = std::thread( [this] { listener_client.loop(); } );
+		*/
+	}
+	
 	~JsonBuilder(){
 		//Close connectino with mosquitto broker
 		this->mosquitto_client.close();
+		//this->listener_client.close();
+		//this->listener_client_thread.join();
 	}
 	//////////////////////////////////////////////////////////////////////////////////////////
 	
@@ -146,8 +152,9 @@ class JsonBuilder{
 	//////////////////////////////////////////////////////////////////////////////////////////
         private:		
 	Mosquitto mosquitto_client;
-	TrialListenerClient listener_client;
-
+	//TrialListenerClient listener_client;
+	//std::thread listener_client_thread;
+	
         //Data for handling opensmile messages
         nlohmann::json opensmile_message;
 	std::vector<std::string> feature_list;
@@ -167,8 +174,8 @@ class JsonBuilder{
         }
 	
 
-	//Static methods for creating common message types	
-        static nlohmann::json create_common_header(){
+	//Methods for creating common message types	
+        nlohmann::json create_common_header(){
 		nlohmann::json header;
                 std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
 
@@ -179,13 +186,13 @@ class JsonBuilder{
 		return header;
         }
 
-	static nlohmann::json create_common_msg(){
+	nlohmann::json create_common_msg(){
 		nlohmann::json message;
                 std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
 
                 message["timestamp"] = timestamp;
-                message["experiment_id"] = nullptr;
-                message["trial_id"] = nullptr;
+                message["experiment_id"] = nullptr;// listener_client.experiment_id;
+                message["trial_id"] = nullptr; //listener_client.trial_id;
                 message["version"] = "0.1";
                 message["source"] = "tomcat_speech_analyzer";
                 message["sub_type"] = "speech_analysis";
