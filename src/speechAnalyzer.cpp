@@ -13,8 +13,7 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
-
-#include "SMILEapi.h"
+#include <smileapi/SMILEapi.h>
 #include "JsonBuilder.hpp"
 #include "SpeechWrapper.cpp"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
@@ -109,7 +108,7 @@ void read_chunks_websocket(){
 	auto const address = asio::ip::make_address("0.0.0.0");
 	auto const port = static_cast<unsigned short>(8888);
 	auto const doc_root = make_shared<std::string>(".");
-	auto const n_threads = 1;
+	auto const n_threads = 4;
 
 	asio::io_context ioc{n_threads};
 
@@ -128,9 +127,11 @@ void read_chunks_websocket(){
 	}
 	ioc.run();
 
+	std::cout << "PAST  RUN " << std::endl;
 	for(auto& thread : threads){
 		thread.join();
 	}
+	std::cout << "PAST JOIN " << std::endl;
 }
 
 void write_thread(){

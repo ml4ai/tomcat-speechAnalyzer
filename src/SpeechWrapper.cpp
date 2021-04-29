@@ -10,6 +10,10 @@ class SpeechWrapper{
 	SpeechWrapper(bool dummy_read){
 		this->dummy_read = dummy_read;
 	}
+	SpeechWrapper(bool dummy_read, int sample_rate){	
+		this->dummy_read = dummy_read;
+		this->sample_rate = sample_rate;
+	}
 	~SpeechWrapper(){
 
 	}
@@ -45,6 +49,7 @@ class SpeechWrapper{
 	grpc::ClientContext context;
 
 	private:
+	int sample_rate = 48000;
 	bool dummy_read = false;
 	bool finished = false;
 	void initialize_stream(){
@@ -63,7 +68,7 @@ class SpeechWrapper{
 
 		auto mutable_config = streaming_config->mutable_config();
 		mutable_config->set_language_code("en");
-		mutable_config->set_sample_rate_hertz(48000);
+		mutable_config->set_sample_rate_hertz(this->sample_rate);
 		mutable_config->set_encoding(RecognitionConfig::LINEAR16);
 		mutable_config->set_max_alternatives(5);
 		mutable_config->set_enable_word_time_offsets(true);

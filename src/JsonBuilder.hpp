@@ -11,7 +11,7 @@
 #include "version.h"
 #include "Mosquitto.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "SMILEapi.h"
+#include <smileapi/SMILEapi.h>
 using google::cloud::speech::v1::WordInfo;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 
