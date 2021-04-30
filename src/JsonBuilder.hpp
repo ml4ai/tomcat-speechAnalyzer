@@ -14,7 +14,6 @@
 #include <smileapi/SMILEapi.h>
 using google::cloud::speech::v1::WordInfo;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
-
 class JsonBuilder{
         
 	//////////////////////////////////////////////////////////////////////////////////////////
@@ -22,19 +21,19 @@ class JsonBuilder{
 	JsonBuilder(){
 		//Setup connection with mosquitto broker
 		this->mosquitto_client.connect("mosquitto", 1883, 1000, 1000, 1000);
-	/*	this->listener_client.connect("127.0.0.1", 5556, 1000, 1000, 1000);
+		this->listener_client.connect("mosquitto", 1883, 1000, 1000, 1000);
+		
 		//Listen for trial id and experiment id
 		this->listener_client.subscribe("trial");
 		this->listener_client.subscribe("experiment");
-		this->listener_client_thread = std::thread( [this] { listener_client.loop(); } );
-		*/
+		this->listener_client_thread = std::thread( [this] { listener_client.loop(); } );		
 	}
 	
 	~JsonBuilder(){
 		//Close connectino with mosquitto broker
 		this->mosquitto_client.close();
-		//this->listener_client.close();
-		//this->listener_client_thread.join();
+		this->listener_client.close();
+		this->listener_client_thread.join();
 	}
 	//////////////////////////////////////////////////////////////////////////////////////////
 	
@@ -43,7 +42,7 @@ class JsonBuilder{
                 temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
                 if(tmeta){
                         if(temp.find("lld") != std::string::npos){
-				this->mosquitto_client.publish("agent/uaz/speechAnalyzer/vocalicFeatures", opensmile_message.dump());
+		//		this->mosquitto_client.publish("agent/uaz/speechAnalyzer/vocalicFeatures", opensmile_message.dump());
 				this->opensmile_history.push_back(this->opensmile_message);
                                 this->opensmile_message["header"] = create_common_header();
 				this->opensmile_message["msg"] = create_common_msg();
@@ -95,7 +94,12 @@ class JsonBuilder{
                         alternatives.push_back(nlohmann::json::object({{"text", alternative.transcript()},{"confidence", alternative.confidence()}}));
                 }
                 message["data"]["alternatives"] = alternatives;
-                this->mosquitto_client.publish("agent/asr", message.dump());
+		if(message["data"]["is_final"]){
+                	this->mosquitto_client.publish("agent/asr/final", message.dump());
+		}
+		else{
+                	this->mosquitto_client.publish("agent/asr/intermediate", message.dump());	
+		}	
 	}
 
         //Data for handling word/feature alignment messages
@@ -138,7 +142,7 @@ class JsonBuilder{
 				message["data"]["start_time"] = start_time;
 				message["data"]["end_time"] = end_time;
 				message["data"]["features"] = features_output;
-				message["data"]["configuration"] = std::string(GIT_COMMIT);
+				message["data"]["git_commit"] = std::string(GIT_COMMIT);
 				message["data"]["id"] = id;
 				message["data"]["time_interval"] = 0.01;
 				this->mosquitto_client.publish("word/feature", message.dump());
@@ -152,8 +156,8 @@ class JsonBuilder{
 	//////////////////////////////////////////////////////////////////////////////////////////
         private:		
 	Mosquitto mosquitto_client;
-	//TrialListenerClient listener_client;
-	//std::thread listener_client_thread;
+	MosquittoListener listener_client;
+	std::thread listener_client_thread;
 	
         //Data for handling opensmile messages
         nlohmann::json opensmile_message;
@@ -191,8 +195,8 @@ class JsonBuilder{
                 std::string timestamp = boost::posix_time::to_iso_extended_string(boost::posix_time::microsec_clock::universal_time()) + "Z";
 
                 message["timestamp"] = timestamp;
-                message["experiment_id"] = nullptr;// listener_client.experiment_id;
-                message["trial_id"] = nullptr; //listener_client.trial_id;
+                message["experiment_id"] =  listener_client.experiment_id;
+                message["trial_id"] = listener_client.trial_id;
                 message["version"] = "0.1";
                 message["source"] = "tomcat_speech_analyzer";
                 message["sub_type"] = "speech_analysis";

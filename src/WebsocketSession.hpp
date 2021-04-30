@@ -71,9 +71,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	this->participant_id = params["id"];
 	this->sample_rate = stoi(params["sampleRate"]);
 
-        // Set suggested timeout settings for the websocket
-        //this->ws_.set_option(
-        //    ws::stream_base::timeout::suggested(beast::role_type::server));
 
         // Set a decorator to change the server of the handshake
         this->ws_.set_option(
@@ -146,14 +143,12 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
 			
 			//Write to openSMILE
-			while(true){
+	/*		while(true){
 				smileres_t result = smile_extaudiosource_write_data(this->handle, "externalAudioSource", (void*)&float_chunk[0], float_chunk.size()*sizeof(float));
 				if(result == SMILE_SUCCESS){
 					break;
 				}
-			}
-
-
+			}*/
 		}
 	}
 	float_sample.close();
@@ -163,9 +158,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	this->asr_reader_thread.join();
 	this->speech_handler->finish_stream();
 	
-	smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
-
-        this->opensmile_thread.join();
+	//smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
+        //this->opensmile_thread.join();
     }
 
     void on_accept(beast::error_code ec) {
@@ -174,11 +168,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         }
 	std::cout << "Accepted connection" << std::endl;	
 	//Initialize openSMILE 
-	this->handle = smile_new();
+	/*this->handle = smile_new();
 	smile_initialize(this->handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
         smile_set_log_callback(this->handle, &log_callback, &(this->builder));
 	this->opensmile_thread = std::thread(smile_run, this->handle);	
-	
+	*/
 	//Initialize Speech Session
 	this->speech_handler = new SpeechWrapper(false, this->sample_rate);
 	this->speech_handler->start_stream();
@@ -194,11 +188,16 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void do_read() {
-        // Read a message into our buffer
-        this->ws_.async_read(
-            this->buffer_,
-            beast::bind_front_handler(&WebsocketSession::on_read,
-                                      this->shared_from_this()));
+	if(!this->read_done){
+		// Read a message into our buffer
+		this->ws_.async_read(
+		    this->buffer_,
+		    beast::bind_front_handler(&WebsocketSession::on_read,
+					      this->shared_from_this()));
+	}
+	else{
+		this->consumer_thread.join();
+	}
     }
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
@@ -206,15 +205,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         // This indicates that the WebsocketSession was closed
         if (ec == ws::error::closed) {
-	    std::cout << "Session closed" << std::endl;
             this->read_done = true;
-            this->consumer_thread.join();
-	    return;
         }
 
         if (ec) {
-	    std::cout << "On Read failed" << std::endl;
-            fail(ec, "read");
+            this->read_done = true;
         }
 
         // Echo the message
@@ -239,24 +234,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	//Do another read
 	this->do_read();
 	
-	/*this->ws_.async_write(
-            this->buffer_.data(),
-            beast::bind_front_handler(&WebsocketSession::on_write,
-                                      this->shared_from_this()));*/
     }
-
-    /*void on_write(beast::error_code ec, size_t bytes_transferred) {
-	std::cout << "ON_WRITE" << std::endl;
-	boost::ignore_unused(bytes_transferred);	
-        if (ec) {
-	    std::cout << "On Write failed" << std::endl;
-            return fail(ec, "write");
-        }
-
-        // Clear the buffer
-        this->buffer_.consume(buffer_.size());
-        // Do another read
-        this->do_read();
-    }*/
 };
 

@@ -93,7 +93,7 @@ void Mosquitto::mosquitto_callback_on_message(
 
     Mosquitto* mosquitto = (Mosquitto*)wrapper_instance;
     mosquitto->last_updated_time = chrono::steady_clock::now();
-    mosquitto->on_message(topic, ss.str());
+   mosquitto->on_message(topic, ss.str());
 }
 
 //----------------------------------------------------------------------
@@ -238,4 +238,9 @@ void Mosquitto::close() {
 void Mosquitto::set_max_seconds_without_messages(
     long max_seconds_without_messages) {
     this->max_seconds_without_messages = max_seconds_without_messages;
+}
+
+
+void MosquittoListener::on_message(const std::string& topic, const std::string& message){
+        std::cout << "MESSAGE" << std::endl;
 }

@@ -191,3 +191,12 @@ class Mosquitto {
 
     long max_seconds_without_messages;
 };
+
+class MosquittoListener : public  Mosquitto{
+	public:
+		std::string trial_id = "";
+		std::string experiment_id = "";
+	
+	protected:
+		void on_message(const std::string& topic, const std::string& message) override;
+};
