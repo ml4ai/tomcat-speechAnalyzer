@@ -1,1 +1,0 @@
-const char* GIT_COMMIT = "a1f5c4f792331d7f52f47150fc4680fce3aa3852";
