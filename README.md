@@ -6,7 +6,7 @@ real-time ASR transcriptions.
 
 Example usage:
 
-    ./speechAnalyzer --mode websocket --mqtt_host "127.0.0.1" --mqtt_port "5556"
+    ./speechAnalyzer --mode websocket --mqtt_host "127.0.0.1" --mqtt_port 5556
 
 To see all available options, run:
 
