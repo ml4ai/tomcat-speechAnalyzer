@@ -9,7 +9,7 @@ services:
     image: speech_analyzer_agent:latest
     container_name: speech_analyzer_agent
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json/google_application_credentials.json
     volumes:
       - ./google_application_credentials.json:/google_application_credentials.json
     networks:

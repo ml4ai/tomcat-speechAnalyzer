@@ -30,14 +30,25 @@ RUN git clone -b ${GRPC_RELEASE_TAG} https://github.com/grpc/grpc /var/local/git
     make  install 
 
 
-#speechAnalyzer setup
-COPY . /app
-WORKDIR /app
-
 #Build opensmile
+RUN apt-get install -y wget
+COPY tools/install_opensmile_from_source .
 RUN ./install_opensmile_from_source
 
-#Build speechAnalyzer
-RUN tools/build.sh
-WORKDIR /app/build
+# speechAnalyzer setup
+COPY external /speechAnalyzer/external
+WORKDIR /speechAnalyzer/external
+RUN mkdir build && cd build && cmake .. && make -j install
 
+COPY src /speechAnalyzer/src
+COPY cmake /speechAnalyzer/cmake
+COPY CMakeLists.txt /speechAnalyzer
+COPY conf /speechAnalyzer/conf
+COPY data /speechAnalyzer/data
+
+WORKDIR /speechAnalyzer
+RUN mkdir build && cd build && cmake .. -DBUILD_GOOGLE_CLOUD_SPEECH_LIB=OFF &&\
+    make -j 
+
+##Build speechAnalyzer
+WORKDIR /speechAnalyzer/build
