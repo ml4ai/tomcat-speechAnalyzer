@@ -12,12 +12,6 @@ To see all available options, run:
 
     ./speechAnalyzer -h
 
-# tomcat-speechAnalyzer
-
-This repository contains C++  code to prepare multimodal (currently audio,
-text, speaker) data for input into models and to instantiate and run these
-models.
-
 ## Prerequisites
 
 * C++ compiler that supports C++17 or higher.
