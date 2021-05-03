@@ -3,7 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <unistd.h>
-
+#include <nlohmann/json.hpp>
 #define MAX_NUM_RECONNECTIONS 5
 
 using namespace std;
@@ -242,5 +242,11 @@ void Mosquitto::set_max_seconds_without_messages(
 
 
 void MosquittoListener::on_message(const std::string& topic, const std::string& message){
-        std::cout << "MESSAGE" << std::endl;
+	nlohmann::json m = nlohmann::json::parse(message);
+	if(m["msg"].contains("trial_id")){
+		this->trial_id = m["msg"]["trial_id"];
+	}
+	else if(m["msg"].contains("experiment_id")){
+		this->experiment_id = m["msg"]["experiment_id"];
+	}
 }
