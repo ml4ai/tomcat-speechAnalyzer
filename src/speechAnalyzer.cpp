@@ -1,26 +1,34 @@
+// STD 
+#include <string>
+#include <thread>
+#include <cerrno>  //errno
+#include <cstring> //strerror
+#include <iostream>
+#include <fstream>
+#include <vector>
+
+// Boost 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/chrono.hpp>
 #include <boost/program_options.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
+// Third Party Libraries
 #include <grpc++/grpc++.h>
-#include <regex>
-#include <string>
-#include <thread>
-#include <cerrno>  //errno
-#include <cstring> //strerror
-#include <iostream>
-#include <vector>
-#include <fstream>
 #include <smileapi/SMILEapi.h>
 #include "JsonBuilder.hpp"
 #include "SpeechWrapper.cpp"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "spsc.h"
 #include "Mosquitto.h"
-#include "helper.h"
 
+// Global variables
+#include "spsc.h"
+#include "helper.h"
+#include "arguments.h"
+
+// Websocket Server files
 #include "util.hpp"
 #include "WebsocketSession.hpp"
 #include "HTTPSession.hpp"
@@ -40,6 +48,7 @@ using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
 using namespace boost::chrono;
+
 void read_chunks_stdin();
 void read_chunks_websocket();
 void write_thread();
@@ -47,22 +56,34 @@ boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>>
 bool read_done = false;
 bool write_start = false;
 
-
-int main(int argc, char * argv[]) {
-    std::string mode;
+int main(int argc, char * argv[]) { 
     //Handle options
     try{
 	options_description desc{"Options"};
 	desc.add_options()
 	  ("help,h", "Help screen")
-	  ("mode", value<std::string>()->default_value("stdin"), "Where to read audio chunks from");
-	  ("sampleRate", value<int>()->default_value(48000), "The sample rate of the input audio");
+	  ("mode", value<std::string>()->default_value("stdin"), "Where to read audio chunks from")
+	  ("mqtt_host", value<std::string>()->default_value("mosquitto"), "The host address of the mqtt broker")
+	  ("mqtt_port", value<int>()->default_value(1883), "The port of the mqtt broker")
+	  ("ws_host", value<std::string>()->default_value("0.0.0.0"), "The host address of the websocket server")
+	  ("ws_port", value<int>()->default_value(8888), "The port of the websocket server");
 	variables_map vm;
 	store(parse_command_line(argc, argv, desc), vm);
 
 	if(vm.count("mode")){
-		mode = vm["mode"].as<std::string>();
-//		std::cout << "Starting speechAnalyzer in " <<  vm["mode"].as<std::string>() << " mode" <<  std::endl;
+		COMMAND_LINE_ARGUMENTS.mode = vm["mode"].as<std::string>();
+	}
+	if(vm.count("mqtt_host")){
+		COMMAND_LINE_ARGUMENTS.mqtt_host = vm["mqtt_host"].as<std::string>();
+	}
+	if(vm.count("mqtt_port")){
+		COMMAND_LINE_ARGUMENTS.mqtt_port = vm["mqtt_port"].as<int>();
+	}
+	if(vm.count("ws_host")){
+		COMMAND_LINE_ARGUMENTS.ws_host = vm["ws_host"].as<std::string>();
+	}
+	if(vm.count("ws_port")){
+		COMMAND_LINE_ARGUMENTS.ws_port = vm["ws_port"].as<int>();
 	}
     }
     catch(const error &ex){
@@ -71,17 +92,15 @@ int main(int argc, char * argv[]) {
     }
 
 
-    if(mode.compare("stdin") == 0){
+    if(COMMAND_LINE_ARGUMENTS.mode.compare("stdin") == 0){
 	    std::thread thread_object(read_chunks_stdin);
 	    std::thread thread_object2(write_thread);
 	    thread_object.join();
 	    thread_object2.join();
     }
-    else if(mode.compare("websocket") == 0){
+    else if(COMMAND_LINE_ARGUMENTS.mode.compare("websocket") == 0){
 	    std::thread thread_object(read_chunks_websocket);
-	    //std::thread thread_object2(write_thread);
 	    thread_object.join();
-	    //thread_object2.join();
     }
     else{
 	std::cout << "Unknown mode" << std::endl;
@@ -105,8 +124,8 @@ void read_chunks_stdin(){
 
 void read_chunks_websocket(){
 	std::cout << "Starting Websocket Server" << std::endl;
-	auto const address = asio::ip::make_address("0.0.0.0");
-	auto const port = static_cast<unsigned short>(8888);
+	auto const address = asio::ip::make_address(COMMAND_LINE_ARGUMENTS.ws_host);
+	auto const port = static_cast<unsigned short>(COMMAND_LINE_ARGUMENTS.ws_port);
 	auto const doc_root = make_shared<std::string>(".");
 	auto const n_threads = 4;
 
@@ -127,11 +146,9 @@ void read_chunks_websocket(){
 	}
 	ioc.run();
 
-	std::cout << "PAST  RUN " << std::endl;
 	for(auto& thread : threads){
 		thread.join();
 	}
-	std::cout << "PAST JOIN " << std::endl;
 }
 
 void write_thread(){

@@ -1,3 +1,4 @@
+#pragma once
 #include <boost/lockfree/spsc_queue.hpp>
 #include <vector>
 

@@ -9,6 +9,7 @@
 #include <thread>
 #include <string>
 #include "version.h"
+#include "arguments.h"
 #include "Mosquitto.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <smileapi/SMILEapi.h>
@@ -20,8 +21,8 @@ class JsonBuilder{
 	public:
 	JsonBuilder(){
 		//Setup connection with mosquitto broker
-		this->mosquitto_client.connect("mosquitto", 1883, 1000, 1000, 1000);
-		this->listener_client.connect("mosquitto", 1883, 1000, 1000, 1000);
+		this->mosquitto_client.connect(COMMAND_LINE_ARGUMENTS.mqtt_host, COMMAND_LINE_ARGUMENTS.mqtt_port, 1000, 1000, 1000);
+		this->listener_client.connect(COMMAND_LINE_ARGUMENTS.mqtt_host, COMMAND_LINE_ARGUMENTS.mqtt_port, 1000, 1000, 1000);
 		
 		//Listen for trial id and experiment id
 		this->listener_client.subscribe("trial");

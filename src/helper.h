@@ -1,3 +1,4 @@
+#pragma once
 #include <smileapi/SMILEapi.h>
 #include <grpc++/grpc++.h>
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
