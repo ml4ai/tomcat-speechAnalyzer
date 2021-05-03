@@ -1,13 +1,12 @@
-# pragma once
+#pragma once
 
 #include <boost/asio.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/optional.hpp>
 
-namespace http = beast::http;     // from <boost/beast/http.hpp>
-namespace asio = boost::asio;     // from <boost/asio.hpp>
-
+namespace http = beast::http; // from <boost/beast/http.hpp>
+namespace asio = boost::asio; // from <boost/asio.hpp>
 
 // Return a reasonable mime type based on the extension of a file.
 beast::string_view mime_type(beast::string_view path) {
@@ -194,7 +193,6 @@ void handle_request(beast::string_view doc_root,
     return send(move(res));
 }
 
-
 // Handles an HTTP server connection
 class HTTPSession : public enable_shared_from_this<HTTPSession> {
     // This queue is used for HTTP pipelining.
@@ -278,7 +276,8 @@ class HTTPSession : public enable_shared_from_this<HTTPSession> {
 
   public:
     // Take ownership of the socket
-    HTTPSession(tcp::socket&& socket, std::shared_ptr<std::string const> const& doc_root)
+    HTTPSession(tcp::socket&& socket,
+                std::shared_ptr<std::string const> const& doc_root)
         : stream_(move(socket)), doc_root_(doc_root), queue_(*this) {}
 
     // Start the session
@@ -328,7 +327,8 @@ class HTTPSession : public enable_shared_from_this<HTTPSession> {
         if (ws::is_upgrade(this->parser_->get())) {
             // Create a websocket session, transferring ownership
             // of both the socket and the HTTP request.
-            auto websocket_session = make_shared<WebsocketSession>(this->stream_.release_socket());
+            auto websocket_session =
+                make_shared<WebsocketSession>(this->stream_.release_socket());
             websocket_session->do_accept(this->parser_->release());
             return;
         }

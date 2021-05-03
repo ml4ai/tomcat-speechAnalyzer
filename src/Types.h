@@ -16,5 +16,5 @@ namespace tomcat {
         typedef std::vector<NodePtr> NodePtrVec;
         typedef std::vector<RVNodePtr> RVNodePtrVec;
         typedef std::shared_ptr<CPD> CPDPtr;
-    }
+    } // namespace model
 } // namespace tomcat

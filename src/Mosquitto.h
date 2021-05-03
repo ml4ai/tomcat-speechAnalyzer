@@ -62,8 +62,8 @@ class Mosquitto {
      * @param milliseconds_before_retrial: number of milliseconds to wait
      * before retry to connect
      */
-    void connect(const std::string& address, int port, int alive_delay, int trials,
-                 int milliseconds_before_retrial);
+    void connect(const std::string& address, int port, int alive_delay,
+                 int trials, int milliseconds_before_retrial);
 
     /**
      * Subscribes to a topic.
@@ -192,11 +192,12 @@ class Mosquitto {
     long max_seconds_without_messages;
 };
 
-class MosquittoListener : public  Mosquitto{
-	public:
-		std::string trial_id = "";
-		std::string experiment_id = "";
-	
-	protected:
-		void on_message(const std::string& topic, const std::string& message) override;
+class MosquittoListener : public Mosquitto {
+  public:
+    std::string trial_id = "";
+    std::string experiment_id = "";
+
+  protected:
+    void on_message(const std::string& topic,
+                    const std::string& message) override;
 };

@@ -2,8 +2,8 @@
 
 #include <boost/beast/core.hpp>
 
-namespace asio = boost::asio;     // from <boost/asio.hpp>
-namespace beast = boost::beast;   // from <boost/beast.hpp>
+namespace asio = boost::asio;   // from <boost/asio.hpp>
+namespace beast = boost::beast; // from <boost/beast.hpp>
 
 // Accepts incoming connections and launches the sessions
 class Listener : public enable_shared_from_this<Listener> {
@@ -12,8 +12,7 @@ class Listener : public enable_shared_from_this<Listener> {
     std::shared_ptr<std::string const> doc_root_;
 
   public:
-    Listener(asio::io_context& ioc,
-             tcp::endpoint endpoint,
+    Listener(asio::io_context& ioc, tcp::endpoint endpoint,
              std::shared_ptr<std::string const> const& doc_root)
         : ioc_(ioc), acceptor_(asio::make_strand(ioc)), doc_root_(doc_root) {
         beast::error_code ec;
@@ -73,7 +72,8 @@ class Listener : public enable_shared_from_this<Listener> {
         }
         else {
             // Create the http session and run it
-            auto http_session = make_shared<HTTPSession>(move(socket), this->doc_root_);
+            auto http_session =
+                make_shared<HTTPSession>(move(socket), this->doc_root_);
             http_session->run();
         }
 

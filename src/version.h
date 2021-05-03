@@ -1,1 +1,1 @@
-extern const char * GIT_COMMIT;
+extern const char* GIT_COMMIT;

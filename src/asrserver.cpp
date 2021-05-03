@@ -7,10 +7,10 @@
 // Official repository: https://github.com/boostorg/beast
 //
 
-#include "util.hpp"
-#include "WebsocketSession.hpp"
 #include "HTTPSession.hpp"
 #include "Listener.hpp"
+#include "WebsocketSession.hpp"
+#include "util.hpp"
 
 #include <algorithm>
 #include <boost/asio/bind_executor.hpp>
@@ -26,16 +26,12 @@
 #include <thread>
 #include <vector>
 
-
-
 namespace beast = boost::beast;   // from <boost/beast.hpp>
 namespace http = beast::http;     // from <boost/beast/http.hpp>
 namespace ws = beast::websocket;  // from <boost/beast/websocket.hpp>
 namespace asio = boost::asio;     // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 using namespace std;
-
-
 
 //------------------------------------------------------------------------------
 
@@ -58,7 +54,8 @@ int main(int argc, char* argv[]) {
     asio::io_context ioc{n_threads};
 
     // Create and launch a listening port
-    auto listener = make_shared<Listener>(ioc, tcp::endpoint{address, port}, doc_root);
+    auto listener =
+        make_shared<Listener>(ioc, tcp::endpoint{address, port}, doc_root);
     listener->run();
 
     // Capture SIGINT and SIGTERM to perform a clean shutdown

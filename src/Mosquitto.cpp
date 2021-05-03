@@ -1,9 +1,9 @@
 #include "Mosquitto.h"
 
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <thread>
 #include <unistd.h>
-#include <nlohmann/json.hpp>
 #define MAX_NUM_RECONNECTIONS 5
 
 using namespace std;
@@ -77,8 +77,7 @@ void Mosquitto::mosquitto_callback_on_connect(struct mosquitto* mqtt_client,
 }
 
 void Mosquitto::mosquitto_callback_on_message(
-    struct mosquitto* mqtt_client,
-    void* wrapper_instance,
+    struct mosquitto* mqtt_client, void* wrapper_instance,
     const struct mosquitto_message* message) {
 
     string topic(message->topic);
@@ -93,13 +92,13 @@ void Mosquitto::mosquitto_callback_on_message(
 
     Mosquitto* mosquitto = (Mosquitto*)wrapper_instance;
     mosquitto->last_updated_time = chrono::steady_clock::now();
-   mosquitto->on_message(topic, ss.str());
+    mosquitto->on_message(topic, ss.str());
 }
 
 //----------------------------------------------------------------------
 // Virtual functions
 //----------------------------------------------------------------------
-void Mosquitto::on_connected() { }
+void Mosquitto::on_connected() {}
 
 void Mosquitto::on_error(const string& error_message) {}
 
@@ -115,13 +114,10 @@ void Mosquitto::copy_wrapper(const Mosquitto& mosquitto) {
     this->running = mosquitto.running;
 }
 
-void Mosquitto::connect(const string& address,
-                        int port,
-                        int alive_delay,
-                        int trials,
-                        int milliseconds_before_retrial) {
+void Mosquitto::connect(const string& address, int port, int alive_delay,
+                        int trials, int milliseconds_before_retrial) {
     while (!this->running && trials > 0) {
-        //cout << "Trying to connect to " << address << ":" << port << "..."
+        // cout << "Trying to connect to " << address << ":" << port << "..."
         //     << endl;
         this_thread::sleep_for(chrono::milliseconds(1000));
         int error_code = mosquitto_connect(
@@ -135,7 +131,7 @@ void Mosquitto::connect(const string& address,
             }
         }
         else {
-            //cout << "Connection established!" << endl;
+            // cout << "Connection established!" << endl;
             this->running = true;
         }
     }
@@ -240,13 +236,13 @@ void Mosquitto::set_max_seconds_without_messages(
     this->max_seconds_without_messages = max_seconds_without_messages;
 }
 
-
-void MosquittoListener::on_message(const std::string& topic, const std::string& message){
-	nlohmann::json m = nlohmann::json::parse(message);
-	if(m["msg"].contains("trial_id")){
-		this->trial_id = m["msg"]["trial_id"];
-	}
-	else if(m["msg"].contains("experiment_id")){
-		this->experiment_id = m["msg"]["experiment_id"];
-	}
+void MosquittoListener::on_message(const std::string& topic,
+                                   const std::string& message) {
+    nlohmann::json m = nlohmann::json::parse(message);
+    if (m["msg"].contains("trial_id")) {
+        this->trial_id = m["msg"]["trial_id"];
+    }
+    else if (m["msg"].contains("experiment_id")) {
+        this->experiment_id = m["msg"]["experiment_id"];
+    }
 }
