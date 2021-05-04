@@ -13,8 +13,6 @@
 
 #include <mosquitto.h>
 
-#include "Definitions.h"
-
 /**
  * A wrapper for the mosquitto C library
  */

@@ -11,12 +11,6 @@ namespace tomcat {
 
         // value filled in the data files for time steps where there's no
         // observation for a given node.
-#define NO_OBS -1
-#define LOG(log) std::cout << log << std::endl
-#define LOG_WARNING(log) std::cerr << log << std::endl
-#define EXISTS(member, container) (container.find(member) != container.end())
-#define EPSILON 1E-15
-#define EMPTY_VECTOR Eigen::VectorXd(0)
 
         /**
          * General exception raised throughout the project
