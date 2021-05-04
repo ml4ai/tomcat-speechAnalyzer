@@ -29,10 +29,10 @@
 #include "spsc.h"
 
 // Websocket Server files
+#include "util.hpp"
+#include "WebsocketSession.hpp"
 #include "HTTPSession.hpp"
 #include "Listener.hpp"
-#include "WebsocketSession.hpp"
-#include "util.hpp"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
