@@ -39,6 +39,4 @@ void process_responses(
         builder->process_asr_message(response, id);
         builder->process_alignment_message(response, id);
     }
-}~
-~
-~
+}

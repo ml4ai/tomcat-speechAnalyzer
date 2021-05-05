@@ -7,7 +7,7 @@
 #include <boost/beast/core.hpp>
 
 #include "util.h"
-
+using namespace std;
 namespace beast = boost::beast; // from <boost/beast.hpp>
 
 using google::cloud::speech::v1::StreamingRecognizeRequest;
