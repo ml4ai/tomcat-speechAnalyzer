@@ -16,18 +16,20 @@
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
 class JsonBuilder {
-
     //////////////////////////////////////////////////////////////////////////////////////////
-  public:
-    JsonBuilder() {
+
+    public:
+    static Arguments args;
+    
+     JsonBuilder() {
         // Setup connection with mosquitto broker
-        this->mosquitto_client.connect(COMMAND_LINE_ARGUMENTS.mqtt_host,
-                                       COMMAND_LINE_ARGUMENTS.mqtt_port,
+        this->mosquitto_client.connect(args.mqtt_host,
+                                       args.mqtt_port,
                                        1000,
                                        1000,
                                        1000);
-        this->listener_client.connect(COMMAND_LINE_ARGUMENTS.mqtt_host,
-                                      COMMAND_LINE_ARGUMENTS.mqtt_port,
+        this->listener_client.connect(args.mqtt_host,
+                                      args.mqtt_port,
                                       1000,
                                       1000,
                                       1000);
@@ -47,13 +49,12 @@ class JsonBuilder {
     }
     //////////////////////////////////////////////////////////////////////////////////////////
 
-    void process_message(smilelogmsg_t message) {
+    void process_message(smilelogmsg_t message) {	
         std::string temp(message.text);
         temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
         if (tmeta) {
             if (temp.find("lld") != std::string::npos) {
-                //		this->mosquitto_client.publish("agent/uaz/speechAnalyzer/vocalicFeatures",
-                //opensmile_message.dump());
+                this->mosquitto_client.publish("agent/uaz/speechAnalyzer/vocalicFeatures", opensmile_message.dump());
                 this->opensmile_history.push_back(this->opensmile_message);
                 this->opensmile_message["header"] = create_common_header();
                 this->opensmile_message["msg"] = create_common_msg();

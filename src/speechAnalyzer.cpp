@@ -25,11 +25,10 @@
 
 // Global variables
 #include "arguments.h"
-#include "helper.h"
 #include "spsc.h"
+#include "util.h"
 
 // Websocket Server files
-#include "util.hpp"
 #include "WebsocketSession.hpp"
 #include "HTTPSession.hpp"
 #include "Listener.hpp"
@@ -48,68 +47,64 @@ using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
 using namespace boost::chrono;
+using namespace std;
 
-void read_chunks_stdin();
-void read_chunks_websocket();
-void write_thread();
+void read_chunks_stdin(Arguments args);
+void read_chunks_websocket(Arguments args);
+void write_thread(Arguments args);
 boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>>
     shared;
 bool read_done = false;
 bool write_start = false;
 
+Arguments JsonBuilder::args;
+Arguments WebsocketSession::args;
+
 int main(int argc, char* argv[]) {
     // Handle options
+    Arguments args;
     try {
         options_description desc{"Options"};
         desc.add_options()("help,h", "Help screen")(
             "mode",
-            value<std::string>()->default_value("stdin"),
+            value<string>(&args.mode)->default_value("stdin"),
             "Where to read audio chunks from")(
             "mqtt_host",
-            value<std::string>()->default_value("mosquitto"),
+            value<string>(&args.mqtt_host)->default_value("mosquitto"),
             "The host address of the mqtt broker")(
             "mqtt_port",
-            value<int>()->default_value(1883),
+            value<int>(&args.mqtt_port)->default_value(1883),
             "The port of the mqtt broker")(
             "ws_host",
-            value<std::string>()->default_value("0.0.0.0"),
+            value<string>(&args.ws_host)->default_value("0.0.0.0"),
             "The host address of the websocket server")(
             "ws_port",
-            value<int>()->default_value(8888),
-            "The port of the websocket server");
-        variables_map vm;
-        store(parse_command_line(argc, argv, desc), vm);
-
-        if (vm.count("mode")) {
-            COMMAND_LINE_ARGUMENTS.mode = vm["mode"].as<std::string>();
-        }
-        if (vm.count("mqtt_host")) {
-            COMMAND_LINE_ARGUMENTS.mqtt_host =
-                vm["mqtt_host"].as<std::string>();
-        }
-        if (vm.count("mqtt_port")) {
-            COMMAND_LINE_ARGUMENTS.mqtt_port = vm["mqtt_port"].as<int>();
-        }
-        if (vm.count("ws_host")) {
-            COMMAND_LINE_ARGUMENTS.ws_host = vm["ws_host"].as<std::string>();
-        }
-        if (vm.count("ws_port")) {
-            COMMAND_LINE_ARGUMENTS.ws_port = vm["ws_port"].as<int>();
-        }
+            value<int>(&args.ws_port)->default_value(8888),
+            "The port of the websocket server")(
+	    "disable_asr",
+	    value<bool>(&args.disable_asr)->default_value(false),
+	    "Disable the asr system of the speechAnalyzer agent")(
+	    "disable_opensmile",
+	    value<bool>(&args.disable_opensmile)->default_value(false),
+            "Disable the opensmile feature extraction system of the speechAnalyzer agent")(
+	    "disable_audio_writing",
+	    value<bool>(&args.disable_audio_writing)->default_value(false),
+	    "Disable writing audio files for the speechAnalyzer agent");
     }
     catch (const error& ex) {
         std::cout << "Error parsing arguments" << std::endl;
         return -1;
     }
-
-    if (COMMAND_LINE_ARGUMENTS.mode.compare("stdin") == 0) {
-        std::thread thread_object(read_chunks_stdin);
-        std::thread thread_object2(write_thread);
+    JsonBuilder::args = args;
+    WebsocketSession::args = args;
+    if (args.mode.compare("stdin") == 0) {
+        std::thread thread_object(read_chunks_stdin, args);
+        std::thread thread_object2(write_thread, args);
         thread_object.join();
         thread_object2.join();
     }
-    else if (COMMAND_LINE_ARGUMENTS.mode.compare("websocket") == 0) {
-        std::thread thread_object(read_chunks_websocket);
+    else if (args.mode.compare("websocket") == 0) {
+        std::thread thread_object(read_chunks_websocket, args);
         thread_object.join();
     }
     else {
@@ -119,27 +114,28 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void read_chunks_stdin() {
-    while (!write_start)
-        ;
+void read_chunks_stdin(Arguments args) {
+    while (!write_start){
+    }
+    
     std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
 
     std::vector<float> chunk(1024);
     std::size_t length;
     while ((length = std::fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
-        while (!shared.push(chunk))
-            ; // If queue is full will keep trying until avaliable space
+        while (!shared.push(chunk)){
+	}  // If queue is full it will keep trying until avaliable space
     }
 
     read_done = true;
 }
 
-void read_chunks_websocket() {
+void read_chunks_websocket(Arguments args) {
     std::cout << "Starting Websocket Server" << std::endl;
-    auto const address = asio::ip::make_address(COMMAND_LINE_ARGUMENTS.ws_host);
+    auto const address = asio::ip::make_address(args.ws_host);
     auto const port =
-        static_cast<unsigned short>(COMMAND_LINE_ARGUMENTS.ws_port);
-    auto const doc_root = make_shared<std::string>(".");
+        static_cast<unsigned short>(args.ws_port);
+    auto const doc_root = make_shared<string>(".");
     auto const n_threads = 4;
 
     asio::io_context ioc{n_threads};
@@ -163,7 +159,7 @@ void read_chunks_websocket() {
     }
 }
 
-void write_thread() {
+void write_thread(Arguments args) {
     int sample_rate = 44100;
     int samples_done = 0;
 
@@ -227,7 +223,7 @@ void write_thread() {
             // Check if asr stream needs to be restarted
             process_real_cpu_clock::time_point stream_current =
                 process_real_cpu_clock::now();
-            if (stream_current - stream_start > seconds{500}) {
+            if (stream_current - stream_start > seconds{240}) {
                 // Send writes_done and finish reading responses
                 speech_handler->send_writes_done();
                 asr_reader_thread.join();

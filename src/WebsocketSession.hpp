@@ -1,5 +1,6 @@
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "helper.h"
+#include "util.h"
+#include "arguments.h"
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
@@ -47,6 +48,9 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     bool is_int16 = true;
 
   public:
+    // Command line arguments
+    static Arguments args;
+    
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
 
@@ -89,9 +93,9 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
   private:
     void write_thread() {
         // Wait for writes to start
-        while (!this->read_start)
-            ;
-
+        while (!this->read_start){
+        }
+	
         ofstream float_sample("float_sample_" + this->participant_id,
                               std::ios::out | std::ios::binary |
                                   std::ios::trunc);
@@ -101,7 +105,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         std::vector<char> chunk(16384);
         while (!this->read_done) {
             while (spsc_queue.pop(chunk)) {
-                this->samples_done += 4096;
+                this->samples_done += 8096;
 
                 // Create f32 and i16 chunks
                 std::vector<float> float_chunk(chunk.size() / sizeof(float));
@@ -120,47 +124,52 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                         float_chunk.push_back((float)(i / 32768.0));
                     }
                 }
-                float_sample.write((char*)&float_chunk[0],
-                                   sizeof(float) * float_chunk.size());
-                int_sample.write((char*)&chunk[0],
-                                 sizeof(int16_t) * chunk.size());
-
-                // Write to google asr service
-                this->speech_handler->send_chunk(int_chunk);
-                // Check if asr stream needs to be restarted
-                process_real_cpu_clock::time_point stream_current =
-                    process_real_cpu_clock::now();
-                if (stream_current - this->stream_start > minutes{4}) {
-                    // Send writes_done and finish reading responses
-                    this->speech_handler->send_writes_done();
-                    this->asr_reader_thread.join();
-                    // End the stream
-                    this->speech_handler->finish_stream();
-                    // Sync Opensmile time
-                    double sync_time =
-                        (double)this->samples_done / this->sample_rate;
-                    this->builder.update_sync_time(sync_time);
-                    // Create new stream
-                    this->speech_handler =
-                        new SpeechWrapper(false, this->sample_rate);
-                    this->speech_handler->start_stream();
-                    // Restart response reader thread
-                    this->asr_reader_thread =
-                        std::thread(process_responses,
-                                    this->speech_handler->streamer.get(),
-                                    &(this->builder));
-                    this->stream_start = process_real_cpu_clock::now();
-                }
-
+		
+		// Write raw audio files
+		if(!this->args.disable_audio_writing){
+			float_sample.write((char*)&float_chunk[0],
+					   sizeof(float) * float_chunk.size());
+			int_sample.write((char*)&chunk[0],
+					 sizeof(int16_t) * chunk.size());
+		}
+                
+		// Write to google asr service
+		if(!this->args.disable_asr){
+			this->speech_handler->send_chunk(int_chunk);
+			// Check if asr stream needs to be restarted
+			process_real_cpu_clock::time_point stream_current =
+			    process_real_cpu_clock::now();
+			if (stream_current - this->stream_start > minutes{4}) {
+			    // Send writes_done and finish reading responses
+			    this->speech_handler->send_writes_done();
+			    this->asr_reader_thread.join();
+			    // End the stream
+			    this->speech_handler->finish_stream();
+			    // Sync Opensmile time
+			    double sync_time =
+				(double)this->samples_done / this->sample_rate;
+			    this->builder.update_sync_time(sync_time);
+			    // Create new stream
+			    this->speech_handler =
+				new SpeechWrapper(false, this->sample_rate);
+			    this->speech_handler->start_stream();
+			    // Restart response reader thread
+			    this->asr_reader_thread =
+				std::thread(process_responses,
+					    this->speech_handler->streamer.get(),
+					    &(this->builder));
+			    this->stream_start = process_real_cpu_clock::now();
+			}
+		}
                 // Write to openSMILE
-                /*		while(true){
-                                        smileres_t result =
-                   smile_extaudiosource_write_data(this->handle,
-                   "externalAudioSource", (void*)&float_chunk[0],
-                   float_chunk.size()*sizeof(float)); if(result ==
-                   SMILE_SUCCESS){ break;
-                                        }
-                                }*/
+                if(!args.disable_opensmile){
+                	while(true){
+                        	smileres_t result = smile_extaudiosource_write_data(this->handle,"externalAudioSource", (void*)&float_chunk[0], float_chunk.size()*sizeof(float)); 
+				if(result == SMILE_SUCCESS){ 
+					break;
+				 }
+                         }
+		}
             }
         }
         float_sample.close();
@@ -170,8 +179,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         this->asr_reader_thread.join();
         this->speech_handler->finish_stream();
 
-        // smile_extaudiosource_set_external_eoi(this->handle,
-        // "externalAudioSource"); this->opensmile_thread.join();
+        if(!this->args.disable_opensmile){
+	 	smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
+		 this->opensmile_thread.join();
+        }
     }
 
     void on_accept(beast::error_code ec) {
@@ -180,22 +191,24 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         }
         std::cout << "Accepted connection" << std::endl;
         // Initialize openSMILE
-        /*this->handle = smile_new();
-        smile_initialize(this->handle, "conf/is09-13/IS13_ComParE.conf", 0,
-        NULL, 1, 0, 0, 0); smile_set_log_callback(this->handle, &log_callback,
-        &(this->builder)); this->opensmile_thread = std::thread(smile_run,
-        this->handle);
-        */
+        if(!this->args.disable_opensmile){
+        	this->handle = smile_new();
+        	smile_initialize(this->handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0); 
+		smile_set_log_callback(this->handle, &log_callback, &(this->builder)); 
+		this->opensmile_thread = std::thread(smile_run, this->handle);
+        
+	}
         // Initialize Speech Session
-        this->speech_handler = new SpeechWrapper(false, this->sample_rate);
-        this->speech_handler->start_stream();
-        this->stream_start = process_real_cpu_clock::now();
-
-        // Initialize asr_reader thread
-        this->asr_reader_thread = std::thread(process_responses,
-                                              speech_handler->streamer.get(),
-                                              &(this->builder));
-
+        if(!this->args.disable_asr){
+		this->speech_handler = new SpeechWrapper(false, this->sample_rate);
+		this->speech_handler->start_stream();
+		this->stream_start = process_real_cpu_clock::now();
+	
+		// Initialize asr_reader thread
+		this->asr_reader_thread = std::thread(process_responses,
+						      speech_handler->streamer.get(),
+						      &(this->builder));
+	}
         this->consumer_thread = std::thread([this] { this->write_thread(); });
 
         // Read a message
@@ -235,8 +248,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                                  bytes_transferred);
 
         auto chunk = std::vector<char>(arr, arr + bytes_transferred);
-        while (!this->spsc_queue.push(chunk))
-            ;
+        while (!this->spsc_queue.push(chunk)){
+	}
 
         // Set read_start
         if (!this->read_start) {

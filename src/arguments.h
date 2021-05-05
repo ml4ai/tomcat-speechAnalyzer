@@ -11,6 +11,10 @@ struct Arguments {
     // Mosquitto options
     std::string mqtt_host = "mosquitto";
     int mqtt_port = 1883;
+
+   // Disable systems
+   bool disable_asr = false;
+   bool disable_opensmile = true;
+   bool disable_audio_writing = false;
 };
 
-extern Arguments COMMAND_LINE_ARGUMENTS;
