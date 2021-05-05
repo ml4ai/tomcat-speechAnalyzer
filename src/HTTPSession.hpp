@@ -7,7 +7,7 @@
 
 namespace http = beast::http; // from <boost/beast/http.hpp>
 namespace asio = boost::asio; // from <boost/asio.hpp>
-
+using namespace std;
 // Return a reasonable mime type based on the extension of a file.
 beast::string_view mime_type(beast::string_view path) {
     using beast::iequals;

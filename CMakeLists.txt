@@ -63,7 +63,7 @@ add_executable(speechAnalyzer
     src/JsonBuilder.hpp
     src/Mosquitto.cpp
     src/SpeechWrapper.cpp
-    src/helper.cpp
+    src/util.cpp
     src/version.cpp
     src/arguments.cpp
 )
