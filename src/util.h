@@ -4,10 +4,19 @@
 #include <grpc++/grpc++.h>
 #include <smileapi/SMILEapi.h>
 
+#include <boost/beast/core.hpp>
+
+#include "util.h"
+
+namespace beast = boost::beast; // from <boost/beast.hpp>
+
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 
-// Callback function for openSMILE log messages
+// Report a failure
+void fail(beast::error_code ec, char const* what);
+
+// Callback function for openSMILE messages
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
 
 // Function for processing asr responses
