@@ -117,8 +117,6 @@ void Mosquitto::copy_wrapper(const Mosquitto& mosquitto) {
 void Mosquitto::connect(const string& address, int port, int alive_delay,
                         int trials, int milliseconds_before_retrial) {
     while (!this->running && trials > 0) {
-        // cout << "Trying to connect to " << address << ":" << port << "..."
-        //     << endl;
         this_thread::sleep_for(chrono::milliseconds(1000));
         int error_code = mosquitto_connect(
             this->mqtt_client, address.c_str(), port, alive_delay);
@@ -240,9 +238,9 @@ void MosquittoListener::on_message(const std::string& topic,
                                    const std::string& message) {
     nlohmann::json m = nlohmann::json::parse(message);
     if (m["msg"].contains("trial_id")) {
-        this->trial_id = m["msg"]["trial_id"];
+	this->trial_id = m["msg"]["trial_id"];
     }
-    else if (m["msg"].contains("experiment_id")) {
+    if (m["msg"].contains("experiment_id")) {
         this->experiment_id = m["msg"]["experiment_id"];
     }
 }

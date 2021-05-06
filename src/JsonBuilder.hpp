@@ -37,6 +37,8 @@ class JsonBuilder {
         // Listen for trial id and experiment id
         this->listener_client.subscribe("trial");
         this->listener_client.subscribe("experiment");
+	
+	this->listener_client.set_max_seconds_without_messages(2147483647); //Max Long value
         this->listener_client_thread =
             std::thread([this] { listener_client.loop(); });
     }
@@ -49,6 +51,8 @@ class JsonBuilder {
     }
     //////////////////////////////////////////////////////////////////////////////////////////
 
+    std::string participant_id = "";
+    
     void process_message(smilelogmsg_t message) {	
         std::string temp(message.text);
         temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
@@ -99,7 +103,7 @@ class JsonBuilder {
             response.results(0).alternatives(0).transcript();
         message["data"]["is_final"] = response.results(0).is_final();
         message["data"]["asr_system"] = "google";
-        message["data"]["participant_id"] = nullptr;
+        message["data"]["participant_id"] = this->participant_id;
         message["data"]["id"] = id;
 
         // Add transcription alternatvies
