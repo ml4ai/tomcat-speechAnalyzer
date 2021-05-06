@@ -6,7 +6,7 @@ networks:
     
 services:
   speech_analyzer_agent:
-    image: speech_analyzer_agent:latest
+    image: gitlab.asist.aptima.com:5050/asist/testbed/speech_analyzer_agent:latest
     container_name: speech_analyzer_agent
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json/google_application_credentials.json
