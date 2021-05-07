@@ -181,7 +181,7 @@ void write_thread(Arguments args) {
     speech_handler->start_stream();
     process_real_cpu_clock::time_point stream_start =
         process_real_cpu_clock::now(); // Need to know starting time to restart
-                                       // steram
+                                       // stream
     // Initialize response reader thread
     thread asr_reader_thread(
         process_responses, speech_handler->streamer.get(), &builder);
