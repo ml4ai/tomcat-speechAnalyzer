@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <smileapi/SMILEapi.h>
 
 // Boost
 #include <boost/chrono.hpp>

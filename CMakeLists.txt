@@ -65,7 +65,6 @@ add_executable(speechAnalyzer
     src/SpeechWrapper.cpp
     src/util.cpp
     src/version.cpp
-    src/arguments.cpp
 )
 
 target_link_libraries(
