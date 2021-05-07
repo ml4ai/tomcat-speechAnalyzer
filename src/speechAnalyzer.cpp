@@ -60,7 +60,6 @@ bool write_start = false;
 Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
 
-
 int main(int argc, char* argv[]) {
     // Handle options
     Arguments args;
@@ -82,15 +81,16 @@ int main(int argc, char* argv[]) {
             "ws_port",
             value<int>(&args.ws_port)->default_value(8888),
             "The port of the websocket server")(
-	    "disable_asr",
-	    value<bool>(&args.disable_asr)->default_value(false),
-	    "Disable the asr system of the speechAnalyzer agent")(
-	    "disable_opensmile",
-	    value<bool>(&args.disable_opensmile)->default_value(false),
-            "Disable the opensmile feature extraction system of the speechAnalyzer agent")(
-	    "disable_audio_writing",
-	    value<bool>(&args.disable_audio_writing)->default_value(false),
-	    "Disable writing audio files for the speechAnalyzer agent");
+            "disable_asr",
+            value<bool>(&args.disable_asr)->default_value(false),
+            "Disable the asr system of the speechAnalyzer agent")(
+            "disable_opensmile",
+            value<bool>(&args.disable_opensmile)->default_value(false),
+            "Disable the opensmile feature extraction system of the "
+            "speechAnalyzer agent")(
+            "disable_audio_writing",
+            value<bool>(&args.disable_audio_writing)->default_value(false),
+            "Disable writing audio files for the speechAnalyzer agent");
     }
     catch (const error& ex) {
         cout << "Error parsing arguments" << endl;
@@ -116,16 +116,16 @@ int main(int argc, char* argv[]) {
 }
 
 void read_chunks_stdin(Arguments args) {
-    while (!write_start){
+    while (!write_start) {
     }
-    
+
     freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
 
     vector<float> chunk(1024);
     size_t length;
     while ((length = fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
-        while (!shared.push(chunk)){
-	}  // If queue is full it will keep trying until avaliable space
+        while (!shared.push(chunk)) {
+        } // If queue is full it will keep trying until avaliable space
     }
 
     read_done = true;
@@ -134,8 +134,7 @@ void read_chunks_stdin(Arguments args) {
 void read_chunks_websocket(Arguments args) {
     cout << "Starting Websocket Server" << endl;
     auto const address = asio::ip::make_address(args.ws_host);
-    auto const port =
-        static_cast<unsigned short>(args.ws_port);
+    auto const port = static_cast<unsigned short>(args.ws_port);
     auto const doc_root = make_shared<string>(".");
     auto const n_threads = 4;
 
@@ -169,6 +168,13 @@ void write_thread(Arguments args) {
 
     // Initialize and start opensmile
     smileobj_t* handle;
+    handle = smile_new();
+    smile_initialize(
+        handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
+    smile_set_log_callback(handle, &log_callback, &builder);
+
+    // Initialize openSMILE thread
+    thread opensmile_thread(smile_run, handle);
 
     // Start speech streamer
     SpeechWrapper* speech_handler = new SpeechWrapper(false);
@@ -180,18 +186,8 @@ void write_thread(Arguments args) {
     thread asr_reader_thread(
         process_responses, speech_handler->streamer.get(), &builder);
 
-    handle = smile_new();
-    smile_initialize(
-        handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
-    smile_set_log_callback(handle, &log_callback, &builder);
-
-    // Initialize opensmile thread
-    thread opensmile_thread(smile_run, handle);
-
-    ofstream float_sample("float_sample",
-                          ios::out | ios::binary | ios::trunc);
-    ofstream int_sample("int_sample",
-                        ios::out | ios::binary | ios::trunc);
+    ofstream float_sample("float_sample", ios::out | ios::binary | ios::trunc);
+    ofstream int_sample("int_sample", ios::out | ios::binary | ios::trunc);
     StreamingRecognizeRequest content_request;
     vector<float> chunk(1024);
     write_start = true;
@@ -209,6 +205,7 @@ void write_thread(Arguments args) {
                     break;
                 }
             }
+
             // Convert 32f chunk to 16i chunk
             vector<int16_t> int_chunk;
             for (float f : chunk) {
@@ -230,7 +227,7 @@ void write_thread(Arguments args) {
                 asr_reader_thread.join();
                 // End the stream
                 speech_handler->finish_stream();
-                // Sync Opensmile time
+                // Sync openSMILE time
                 double sync_time = (double)samples_done / sample_rate;
                 builder.update_sync_time(sync_time);
                 // Create new stream
@@ -238,8 +235,8 @@ void write_thread(Arguments args) {
                 speech_handler->start_stream();
                 // Restart response reader thread
                 asr_reader_thread = thread(process_responses,
-                                                speech_handler->streamer.get(),
-                                                &builder);
+                                           speech_handler->streamer.get(),
+                                           &builder);
                 stream_start = process_real_cpu_clock::now();
             }
         }
@@ -250,7 +247,7 @@ void write_thread(Arguments args) {
     speech_handler->send_writes_done();
     asr_reader_thread.join();
     speech_handler->finish_stream();
+    
     smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
-
     opensmile_thread.join();
 }

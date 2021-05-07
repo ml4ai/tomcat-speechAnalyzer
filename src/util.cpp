@@ -33,8 +33,7 @@ void process_responses(
     StreamingRecognizeResponse response;
     while (streamer->Read(&response)) { // Returns false when no more to read.
                                         // Generate UUID4 for messages
-        string id =
-            boost::uuids::to_string(boost::uuids::random_generator()());
+        string id = boost::uuids::to_string(boost::uuids::random_generator()());
         // Process messages
         builder->process_asr_message(response, id);
     }

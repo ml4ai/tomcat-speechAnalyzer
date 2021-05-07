@@ -234,11 +234,10 @@ void Mosquitto::set_max_seconds_without_messages(
     this->max_seconds_without_messages = max_seconds_without_messages;
 }
 
-void MosquittoListener::on_message(const string& topic,
-                                   const string& message) {
+void MosquittoListener::on_message(const string& topic, const string& message) {
     nlohmann::json m = nlohmann::json::parse(message);
     if (m["msg"].contains("trial_id")) {
-	this->trial_id = m["msg"]["trial_id"];
+        this->trial_id = m["msg"]["trial_id"];
     }
     if (m["msg"].contains("experiment_id")) {
         this->experiment_id = m["msg"]["experiment_id"];
