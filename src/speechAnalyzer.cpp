@@ -16,9 +16,9 @@
 #include <boost/uuid/uuid_io.hpp>
 
 // Third Party Libraries
-#include "JsonBuilder.hpp"
+#include "JsonBuilder.h"
 #include "Mosquitto.h"
-#include "SpeechWrapper.cpp"
+#include "SpeechWrapper.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <smileapi/SMILEapi.h>
@@ -59,6 +59,7 @@ bool write_start = false;
 
 Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
+
 
 int main(int argc, char* argv[]) {
     // Handle options

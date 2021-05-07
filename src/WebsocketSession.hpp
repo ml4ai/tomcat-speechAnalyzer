@@ -1,16 +1,22 @@
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "util.h"
-#include "arguments.h"
+#include <fstream>
+#include <stdio.h>
+#include <iostream>
+#include <thread>
+
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
-#include <fstream>
-#include <grpc++/grpc++.h>
-#include <iostream>
+
 #include <range/v3/all.hpp>
 #include <smileapi/SMILEapi.h>
-#include <stdio.h>
-#include <thread>
+#include <grpc++/grpc++.h>
+#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "JsonBuilder.h"
+#include "SpeechWrapper.h"
+
+#include "util.h"
+#include "arguments.h"
+
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
@@ -74,6 +80,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
+
+	this->builder.participant_id = this->participant_id;
 
         // Set a decorator to change the server of the handshake
         this->ws_.set_option(

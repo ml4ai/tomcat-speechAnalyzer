@@ -60,7 +60,7 @@ endif()
 
 add_executable(speechAnalyzer 
     src/speechAnalyzer.cpp
-    src/JsonBuilder.hpp
+    src/JsonBuilder.cpp
     src/Mosquitto.cpp
     src/SpeechWrapper.cpp
     src/util.cpp
