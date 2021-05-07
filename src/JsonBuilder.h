@@ -29,7 +29,7 @@ class JsonBuilder {
     void process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
-    // Update the sync time for
+    // Update the sync time for word/feature alignment messages
     void update_sync_time(double sync_time);
 
   private:

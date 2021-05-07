@@ -17,4 +17,3 @@ services:
         aliases:
           - speech_analyzer_agent
     entrypoint: ./speechAnalyzer --mode websocket
-
