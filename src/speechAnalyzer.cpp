@@ -29,9 +29,9 @@
 #include "util.h"
 
 // Websocket Server files
-#include "WebsocketSession.hpp"
-#include "HTTPSession.hpp"
-#include "Listener.hpp"
+#include "WebsocketSession.h"
+#include "HTTPSession.h"
+#include "Listener.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -52,7 +52,7 @@ using namespace std;
 void read_chunks_stdin(Arguments args);
 void read_chunks_websocket(Arguments args);
 void write_thread(Arguments args);
-boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>>
+boost::lockfree::spsc_queue<vector<float>, boost::lockfree::capacity<1024>>
     shared;
 bool read_done = false;
 bool write_start = false;
@@ -93,23 +93,23 @@ int main(int argc, char* argv[]) {
 	    "Disable writing audio files for the speechAnalyzer agent");
     }
     catch (const error& ex) {
-        std::cout << "Error parsing arguments" << std::endl;
+        cout << "Error parsing arguments" << endl;
         return -1;
     }
     JsonBuilder::args = args;
     WebsocketSession::args = args;
     if (args.mode.compare("stdin") == 0) {
-        std::thread thread_object(read_chunks_stdin, args);
-        std::thread thread_object2(write_thread, args);
+        thread thread_object(read_chunks_stdin, args);
+        thread thread_object2(write_thread, args);
         thread_object.join();
         thread_object2.join();
     }
     else if (args.mode.compare("websocket") == 0) {
-        std::thread thread_object(read_chunks_websocket, args);
+        thread thread_object(read_chunks_websocket, args);
         thread_object.join();
     }
     else {
-        std::cout << "Unknown mode" << std::endl;
+        cout << "Unknown mode" << endl;
     }
 
     return 0;
@@ -119,11 +119,11 @@ void read_chunks_stdin(Arguments args) {
     while (!write_start){
     }
     
-    std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
+    freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
 
-    std::vector<float> chunk(1024);
-    std::size_t length;
-    while ((length = std::fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
+    vector<float> chunk(1024);
+    size_t length;
+    while ((length = fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
         while (!shared.push(chunk)){
 	}  // If queue is full it will keep trying until avaliable space
     }
@@ -132,7 +132,7 @@ void read_chunks_stdin(Arguments args) {
 }
 
 void read_chunks_websocket(Arguments args) {
-    std::cout << "Starting Websocket Server" << std::endl;
+    cout << "Starting Websocket Server" << endl;
     auto const address = asio::ip::make_address(args.ws_host);
     auto const port =
         static_cast<unsigned short>(args.ws_port);
@@ -148,7 +148,7 @@ void read_chunks_websocket(Arguments args) {
     asio::signal_set signals(ioc, SIGINT, SIGTERM);
     signals.async_wait([&](beast::error_code const&, int) { ioc.stop(); });
 
-    std::vector<std::thread> threads;
+    vector<thread> threads;
     threads.reserve(n_threads - 1);
     for (auto i = n_threads; i > 0; --i) {
         threads.emplace_back([&ioc] { ioc.run(); });
@@ -177,7 +177,7 @@ void write_thread(Arguments args) {
         process_real_cpu_clock::now(); // Need to know starting time to restart
                                        // steram
     // Initialize response reader thread
-    std::thread asr_reader_thread(
+    thread asr_reader_thread(
         process_responses, speech_handler->streamer.get(), &builder);
 
     handle = smile_new();
@@ -186,14 +186,14 @@ void write_thread(Arguments args) {
     smile_set_log_callback(handle, &log_callback, &builder);
 
     // Initialize opensmile thread
-    std::thread opensmile_thread(smile_run, handle);
+    thread opensmile_thread(smile_run, handle);
 
     ofstream float_sample("float_sample",
-                          std::ios::out | std::ios::binary | std::ios::trunc);
+                          ios::out | ios::binary | ios::trunc);
     ofstream int_sample("int_sample",
-                        std::ios::out | std::ios::binary | std::ios::trunc);
+                        ios::out | ios::binary | ios::trunc);
     StreamingRecognizeRequest content_request;
-    std::vector<float> chunk(1024);
+    vector<float> chunk(1024);
     write_start = true;
     while (!read_done) {
         while (shared.pop(chunk)) {
@@ -210,7 +210,7 @@ void write_thread(Arguments args) {
                 }
             }
             // Convert 32f chunk to 16i chunk
-            std::vector<int16_t> int_chunk;
+            vector<int16_t> int_chunk;
             for (float f : chunk) {
                 int_chunk.push_back((int16_t)(f * 32768));
             }
@@ -237,7 +237,7 @@ void write_thread(Arguments args) {
                 speech_handler = new SpeechWrapper(false);
                 speech_handler->start_stream();
                 // Restart response reader thread
-                asr_reader_thread = std::thread(process_responses,
+                asr_reader_thread = thread(process_responses,
                                                 speech_handler->streamer.get(),
                                                 &builder);
                 stream_start = process_real_cpu_clock::now();

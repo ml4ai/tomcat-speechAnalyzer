@@ -34,7 +34,7 @@ JsonBuilder::JsonBuilder() {
 	this->listener_client.subscribe("experiment");
 	this->listener_client.set_max_seconds_without_messages(2147483647); //Max Long value
 	this->listener_client_thread =
-	    std::thread([this] { listener_client.loop(); });
+	    thread([this] { listener_client.loop(); });
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -99,7 +99,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 	message["data"]["id"] = id;
 
 	// Add transcription alternatvies
-	std::vector<nlohmann::json> alternatives;
+	vector<nlohmann::json> alternatives;
 	auto result = response.results(0);
 	for (int i = 0; i < result.alternatives_size(); i++) {
 	    auto alternative = result.alternatives(i);
@@ -149,7 +149,7 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
 		}
 		else {
 		    for (auto& it : history[0].items()) {
-			features_output[it.key()] = std::vector<double>();
+			features_output[it.key()] = vector<double>();
 		    }
 		    // Load the features output from the history entries
 		    for (auto entry : history) {
@@ -188,7 +188,7 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
 // Methods for creating common message types
 nlohmann::json JsonBuilder::create_common_header() {
 	nlohmann::json header;
-	std::string timestamp =
+	string timestamp =
 	    boost::posix_time::to_iso_extended_string(
 		boost::posix_time::microsec_clock::universal_time()) +
 	    "Z";
@@ -202,7 +202,7 @@ nlohmann::json JsonBuilder::create_common_header() {
 
 nlohmann::json JsonBuilder::create_common_msg() {
 	nlohmann::json message;
-	std::string timestamp =
+	string timestamp =
 	    boost::posix_time::to_iso_extended_string(
 		boost::posix_time::microsec_clock::universal_time()) +
 	    "Z";

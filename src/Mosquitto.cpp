@@ -234,8 +234,8 @@ void Mosquitto::set_max_seconds_without_messages(
     this->max_seconds_without_messages = max_seconds_without_messages;
 }
 
-void MosquittoListener::on_message(const std::string& topic,
-                                   const std::string& message) {
+void MosquittoListener::on_message(const string& topic,
+                                   const string& message) {
     nlohmann::json m = nlohmann::json::parse(message);
     if (m["msg"].contains("trial_id")) {
 	this->trial_id = m["msg"]["trial_id"];
