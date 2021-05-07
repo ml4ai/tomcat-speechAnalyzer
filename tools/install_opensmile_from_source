@@ -10,5 +10,5 @@ pushd opensmile
     cd build
     cmake ..
     make -j
-    sudo make -j install
+    make -j install
 popd

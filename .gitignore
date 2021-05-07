@@ -1,6 +1,3 @@
-# Prerequisites
-*.d
-
 # Compiled Object files
 *.slo
 *.lo
@@ -31,4 +28,6 @@
 *.out
 *.app
 
-build
+build/
+lib/
+version.cpp

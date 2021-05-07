@@ -1,25 +1,38 @@
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
-#include <boost/program_options.hpp>
+// STD
 #include <cerrno>  //errno
 #include <cstring> //strerror
 #include <fstream>
-#include <grpc++/grpc++.h>
 #include <iostream>
-#include <regex>
 #include <string>
 #include <thread>
 #include <vector>
 #include <smileapi/SMILEapi.h>
 
-#include "JsonBuilder.cpp"
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "spsc.h"
+// Boost
+#include <boost/chrono.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/program_options.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
-#include "util.hpp"
-#include "WebsocketSession.hpp"
-#include "HTTPSession.hpp"
-#include "Listener.hpp"
+// Third Party Libraries
+#include "JsonBuilder.h"
+#include "Mosquitto.h"
+#include "SpeechWrapper.h"
+#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include <grpc++/grpc++.h>
+#include <smileapi/SMILEapi.h>
+
+// Global variables
+#include "arguments.h"
+#include "spsc.h"
+#include "util.h"
+
+// Websocket Server files
+#include "WebsocketSession.h"
+#include "HTTPSession.h"
+#include "Listener.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -32,85 +45,98 @@ using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
-
+using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
-const size_t MAX_NUM_SAMPLES = 512;
+using namespace boost::chrono;
+using namespace std;
 
-void read_chunks_stdin();
-void read_chunks_websocket();
-void write_thread();
-void log_callback(smileobj_t*, smilelogmsg_t, void*);
-void read_responses(grpc::ClientReaderWriterInterface<
-                    StreamingRecognizeRequest, StreamingRecognizeResponse>*);
-boost::lockfree::spsc_queue<std::vector<float>, boost::lockfree::capacity<1024>>
+void read_chunks_stdin(Arguments args);
+void read_chunks_websocket(Arguments args);
+void write_thread(Arguments args);
+boost::lockfree::spsc_queue<vector<float>, boost::lockfree::capacity<1024>>
     shared;
 bool read_done = false;
 bool write_start = false;
 
+Arguments JsonBuilder::args;
+Arguments WebsocketSession::args;
+
 int main(int argc, char* argv[]) {
-    std::string mode;
     // Handle options
+    Arguments args;
     try {
         options_description desc{"Options"};
         desc.add_options()("help,h", "Help screen")(
             "mode",
-            value<std::string>()->default_value("stdin"),
-            "Where to read audio chunks from");
-        ("sampleRate",
-         value<int>()->default_value(48000),
-         "The sample rate of the input audio");
-        variables_map vm;
-        store(parse_command_line(argc, argv, desc), vm);
-
-        if (vm.count("mode")) {
-            mode = vm["mode"].as<std::string>();
-            //		std::cout << "Starting speechAnalyzer in " <<
-            //vm["mode"].as<std::string>() << " mode" <<  std::endl;
-        }
+            value<string>(&args.mode)->default_value("stdin"),
+            "Where to read audio chunks from")(
+            "mqtt_host",
+            value<string>(&args.mqtt_host)->default_value("mosquitto"),
+            "The host address of the mqtt broker")(
+            "mqtt_port",
+            value<int>(&args.mqtt_port)->default_value(1883),
+            "The port of the mqtt broker")(
+            "ws_host",
+            value<string>(&args.ws_host)->default_value("0.0.0.0"),
+            "The host address of the websocket server")(
+            "ws_port",
+            value<int>(&args.ws_port)->default_value(8888),
+            "The port of the websocket server")(
+            "disable_asr",
+            value<bool>(&args.disable_asr)->default_value(false),
+            "Disable the asr system of the speechAnalyzer agent")(
+            "disable_opensmile",
+            value<bool>(&args.disable_opensmile)->default_value(false),
+            "Disable the opensmile feature extraction system of the "
+            "speechAnalyzer agent")(
+            "disable_audio_writing",
+            value<bool>(&args.disable_audio_writing)->default_value(false),
+            "Disable writing audio files for the speechAnalyzer agent");
     }
     catch (const error& ex) {
-        std::cout << "Error parsing arguments" << std::endl;
+        cout << "Error parsing arguments" << endl;
         return -1;
     }
-
-    if (mode.compare("stdin") == 0) {
-        std::thread thread_object(read_chunks_stdin);
-        std::thread thread_object2(write_thread);
+    JsonBuilder::args = args;
+    WebsocketSession::args = args;
+    if (args.mode.compare("stdin") == 0) {
+        thread thread_object(read_chunks_stdin, args);
+        thread thread_object2(write_thread, args);
         thread_object.join();
         thread_object2.join();
     }
-    else if (mode.compare("websocket") == 0) {
-        std::thread thread_object(read_chunks_websocket);
-        std::thread thread_object2(write_thread);
+    else if (args.mode.compare("websocket") == 0) {
+        thread thread_object(read_chunks_websocket, args);
         thread_object.join();
-        thread_object2.join();
     }
     else {
-        std::cout << "Unknown mode" << std::endl;
+        cout << "Unknown mode" << endl;
     }
 
     return 0;
 }
 
-void read_chunks_stdin() {
-    while (!write_start)
-        ;
-    std::freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
+void read_chunks_stdin(Arguments args) {
+    while (!write_start) {
+    }
 
-    std::vector<float> chunk(1024);
-    std::size_t length;
-    while ((length = std::fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
-        while (!shared.push(chunk))
-            ; // If queue is full will keep trying until avaliable space
+    freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
+
+    vector<float> chunk(1024);
+    size_t length;
+    while ((length = fread(&chunk[0], sizeof(float), 1024, stdin)) > 0) {
+        while (!shared.push(chunk)) {
+        } // If queue is full it will keep trying until avaliable space
     }
 
     read_done = true;
 }
 
-void read_chunks_websocket() {
-    auto const address = asio::ip::make_address("127.0.0.1");
-    auto const port = static_cast<unsigned short>(8888);
-    auto const doc_root = make_shared<std::string>(".");
+void read_chunks_websocket(Arguments args) {
+    cout << "Starting Websocket Server" << endl;
+    auto const address = asio::ip::make_address(args.ws_host);
+    auto const port = static_cast<unsigned short>(args.ws_port);
+    auto const doc_root = make_shared<string>(".");
     auto const n_threads = 4;
 
     asio::io_context ioc{n_threads};
@@ -122,7 +148,7 @@ void read_chunks_websocket() {
     asio::signal_set signals(ioc, SIGINT, SIGTERM);
     signals.async_wait([&](beast::error_code const&, int) { ioc.stop(); });
 
-    std::vector<std::thread> threads;
+    vector<thread> threads;
     threads.reserve(n_threads - 1);
     for (auto i = n_threads; i > 0; --i) {
         threads.emplace_back([&ioc] { ioc.run(); });
@@ -134,57 +160,41 @@ void read_chunks_websocket() {
     }
 }
 
-void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
+void write_thread(Arguments args) {
+    int sample_rate = 44100;
+    int samples_done = 0;
 
-    JsonBuilder* builder = (JsonBuilder*)(param);
-    builder->process_message(message);
-}
-
-void write_thread() {
     // JsonBuilder object which will be passed to openSMILE log callback
     JsonBuilder builder;
 
     // Initialize and start opensmile
     smileobj_t* handle;
-
-    // Create a Speech Stub connected to speech service
-    auto creds = grpc::GoogleDefaultCredentials();
-    auto channel = grpc::CreateChannel("speech.googleapis.com", creds);
-    std::unique_ptr<Speech::Stub> speech(Speech::NewStub(channel));
-    // Handle streaming config
-    StreamingRecognizeRequest request;
-    auto* streaming_config = request.mutable_streaming_config();
-    // Begin a stream
-    grpc::ClientContext context;
-    auto streamer = speech->StreamingRecognize(&context);
-    // Write first request with config
-    auto mutable_config = streaming_config->mutable_config();
-    mutable_config->set_language_code("en");
-    mutable_config->set_sample_rate_hertz(44100);
-    mutable_config->set_encoding(RecognitionConfig::LINEAR16);
-    mutable_config->set_max_alternatives(5);
-    streaming_config->set_interim_results(true);
-    streamer->Write(request);
-    // Initialize response reader thread
-    std::thread asr_reader_thread(read_responses, streamer.get());
-
     handle = smile_new();
     smile_initialize(
         handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
     smile_set_log_callback(handle, &log_callback, &builder);
 
-    // Initialize opensmile thread
-    std::thread opensmile_thread(smile_run, handle);
+    // Initialize openSMILE thread
+    thread opensmile_thread(smile_run, handle);
 
-    ofstream float_sample("float_sample",
-                          std::ios::out | std::ios::binary | std::ios::app);
-    ofstream int_sample("int_sample",
-                        std::ios::out | std::ios::binary | std::ios::app);
+    // Start speech streamer
+    SpeechWrapper* speech_handler = new SpeechWrapper(false);
+    speech_handler->start_stream();
+    process_real_cpu_clock::time_point stream_start =
+        process_real_cpu_clock::now(); // Need to know starting time to restart
+                                       // stream
+    // Initialize response reader thread
+    thread asr_reader_thread(
+        process_responses, speech_handler->streamer.get(), &builder);
+
+    ofstream float_sample("float_sample", ios::out | ios::binary | ios::trunc);
+    ofstream int_sample("int_sample", ios::out | ios::binary | ios::trunc);
     StreamingRecognizeRequest content_request;
-    std::vector<float> chunk(1024);
+    vector<float> chunk(1024);
     write_start = true;
     while (!read_done) {
         while (shared.pop(chunk)) {
+            samples_done += 1024;
             // Write to opensmile
             while (true) {
                 smileres_t result = smile_extaudiosource_write_data(
@@ -198,7 +208,7 @@ void write_thread() {
             }
 
             // Convert 32f chunk to 16i chunk
-            std::vector<int16_t> int_chunk;
+            vector<int16_t> int_chunk;
             for (float f : chunk) {
                 int_chunk.push_back((int16_t)(f * 32768));
             }
@@ -207,61 +217,38 @@ void write_thread() {
                              sizeof(int16_t) * int_chunk.size());
 
             // Write to google asr service
-            content_request.set_audio_content(
-                &int_chunk[0], int_chunk.size() * sizeof(int16_t));
-            streamer->Write(content_request);
+            speech_handler->send_chunk(int_chunk);
+
+            // Check if asr stream needs to be restarted
+            process_real_cpu_clock::time_point stream_current =
+                process_real_cpu_clock::now();
+            if (stream_current - stream_start > seconds{240}) {
+                // Send writes_done and finish reading responses
+                speech_handler->send_writes_done();
+                asr_reader_thread.join();
+                // End the stream
+                speech_handler->finish_stream();
+                // Sync openSMILE time
+                double sync_time = (double)samples_done / sample_rate;
+                builder.update_sync_time(sync_time);
+                // Create new stream
+                speech_handler = new SpeechWrapper(false);
+                speech_handler->start_stream();
+                // Restart response reader thread
+                asr_reader_thread = thread(process_responses,
+                                           speech_handler->streamer.get(),
+                                           &builder);
+                stream_start = process_real_cpu_clock::now();
+            }
         }
     }
     float_sample.close();
     int_sample.close();
-    streamer->WritesDone();
-    grpc::Status status = streamer->Finish();
-    if (!status.ok()) {
-        // Report the RPC failure.
-        std::cerr << status.error_message() << std::endl;
-    }
-    smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
 
-    opensmile_thread.join();
+    speech_handler->send_writes_done();
     asr_reader_thread.join();
-}
-
-void read_responses(
-    grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-                                      StreamingRecognizeResponse>* streamer) {
-
-    StreamingRecognizeResponse response;
-    while (streamer->Read(&response)) { // Returns false when no more to read.
-        // Dump the transcript of all the results.
-
-        std::string timestamp =
-            boost::posix_time::to_iso_extended_string(
-                boost::posix_time::microsec_clock::universal_time()) +
-            "Z";
-        nlohmann::json j;
-        j["header"]["timestamp"] = timestamp;
-        j["header"]["message_type"] = "observation";
-        j["header"]["version"] = 0.1;
-        j["msg"]["timestamp"] = timestamp;
-        j["msg"]["experiment_id"] = nullptr;
-        j["msg"]["trial_id"] = nullptr;
-        j["msg"]["version"] = "0.1";
-        j["msg"]["source"] = "tomcat_speech_analyzer";
-        j["msg"]["sub_type"] = "speech_analysis";
-        j["data"]["text"] = response.results(0).alternatives(0).transcript();
-        j["data"]["is_final"] = response.results(0).is_final();
-        j["data"]["asr_system"] = "google";
-        j["data"]["participant_id"] = nullptr;
-
-        std::vector<nlohmann::json> alternatives;
-        auto result = response.results(0);
-        for (int i = 0; i < result.alternatives_size(); i++) {
-            auto alternative = result.alternatives(i);
-            alternatives.push_back(nlohmann::json::object(
-                {{"text", alternative.transcript()},
-                 {"confidence", alternative.confidence()}}));
-        }
-        j["data"]["alternatives"] = alternatives;
-        std::cout << j << std::endl;
-    }
+    speech_handler->finish_stream();
+    
+    smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
+    opensmile_thread.join();
 }
