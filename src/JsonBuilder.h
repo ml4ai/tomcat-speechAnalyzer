@@ -13,6 +13,8 @@ class JsonBuilder {
   public:
     static Arguments args;
     std::string participant_id;
+    std::string trial_id;
+    std::string experiment_id;
 
     JsonBuilder();
     ~JsonBuilder();

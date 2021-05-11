@@ -19,6 +19,7 @@
 // Third Party Libraries
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
+#include "GlobalMosquittoListener.h"
 #include "SpeechWrapper.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
@@ -99,6 +100,15 @@ int main(int argc, char* argv[]) {
     }
     JsonBuilder::args = args;
     WebsocketSession::args = args;
+
+    // Setup Global Listener
+    GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000,1000,1000);
+    GLOBAL_LISTENER.subscribe("trial");
+    GLOBAL_LISTENER.subscribe("experiment");
+    GLOBAL_LISTENER.set_max_seconds_without_messages(
+        2147483647); // Max Long value
+    GLOBAL_LISTENER_THREAD = thread([] { GLOBAL_LISTENER.loop(); });
+
     if (args.mode.compare("stdin") == 0) {
         thread thread_object(read_chunks_stdin, args);
         thread thread_object2(write_thread, args);
@@ -112,6 +122,10 @@ int main(int argc, char* argv[]) {
     else {
         cout << "Unknown mode" << endl;
     }
+    
+    // Join Global Listener
+    GLOBAL_LISTENER.close();
+    GLOBAL_LISTENER_THREAD.join();
 
     return 0;
 }

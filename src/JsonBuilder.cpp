@@ -6,6 +6,7 @@
 
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
+#include "GlobalMosquittoListener.h"
 #include "arguments.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "version.h"
@@ -201,8 +202,8 @@ nlohmann::json JsonBuilder::create_common_msg() {
         "Z";
 
     message["timestamp"] = timestamp;
-    message["experiment_id"] = listener_client.experiment_id;
-    message["trial_id"] = listener_client.trial_id;
+    message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
+    message["trial_id"] = GLOBAL_LISTENER.trial_id;
     message["version"] = "0.1";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = "speech_analysis";
