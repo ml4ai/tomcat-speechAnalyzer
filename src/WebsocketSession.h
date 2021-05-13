@@ -2,7 +2,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <thread>
-
+#include <chrono>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
@@ -81,7 +81,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
 
-        this->builder.participant_id = this->participant_id;
+	GLOBAL_LISTENER.playername = params["id"];
 
         // Set a decorator to change the server of the handshake
         this->ws_.set_option(
@@ -269,10 +269,15 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                                  bytes_transferred);
 
         auto chunk = std::vector<char>(arr, arr + bytes_transferred);
-        while (!this->spsc_queue.push(chunk)) {
+        
+	// Push chunk to queue for write_thread
+	while (!this->spsc_queue.push(chunk)) {
         }
 
-        // Set read_start
+	// Send chunk for raw audio message
+	this->builder.process_audio_chunk_message(chunk);
+        
+	// Set read_start
         if (!this->read_start) {
             this->read_start = true;
         }

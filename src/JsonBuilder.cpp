@@ -10,6 +10,7 @@
 #include "arguments.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include "version.h"
+#include "base64.h"
 #include <nlohmann/json.hpp>
 #include <smileapi/SMILEapi.h>
 
@@ -88,7 +89,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     message["data"]["text"] = response.results(0).alternatives(0).transcript();
     message["data"]["is_final"] = response.results(0).is_final();
     message["data"]["asr_system"] = "google";
-    message["data"]["participant_id"] = this->participant_id;
+    message["data"]["participant_id"] = GLOBAL_LISTENER.participant_id;
     message["data"]["id"] = id;
 
     // Add transcription alternatvies
@@ -163,6 +164,21 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
     }
 }
 
+void JsonBuilder::process_audio_chunk_message(vector<char> chunk){
+	// Encode audio chunk
+	int encoded_data_length = Base64encode_len(chunk.size());
+	char output[encoded_data_length];
+	Base64encode(output, &chunk[0], chunk.size());
+	string encoded(output);
+
+	// Create message
+	nlohmann::json message;
+    	message["header"] = create_common_header();
+   	message["msg"] = create_common_msg();
+	message["data"]["encoded"] = encoded;
+	message["data"]["format"] = "int16";	
+	this->mosquitto_client.publish("audio", message.dump());	
+}
 void JsonBuilder::update_sync_time(double sync_time) {
     this->sync_time = sync_time;
 }
