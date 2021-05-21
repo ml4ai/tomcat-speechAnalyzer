@@ -275,9 +275,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         }
 	
 	// Send chunk for raw audio message
-	this->builder.process_audio_chunk_message(chunk);
-	this->builder.process_audio_chunk_metadata_message(chunk);
-        
+	if(!args.disable_chunk_publishing){
+		this->builder.process_audio_chunk_message(chunk);
+		this->builder.process_audio_chunk_metadata_message(chunk);
+        }
+
 	// Set read_start
         if (!this->read_start) {
             this->read_start = true;

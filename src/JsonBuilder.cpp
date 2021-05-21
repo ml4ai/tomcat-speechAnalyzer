@@ -176,7 +176,6 @@ void JsonBuilder::process_audio_chunk_message(vector<char> chunk){
     	message["header"] = create_common_header();
    	message["msg"] = create_common_msg();
 	message["data"]["encoded"] = encoded;
-	message["data"]["format"] = "int16";	
 	this->mosquitto_client.publish("audio/chunk", message.dump());	
 }
 
@@ -185,6 +184,7 @@ void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk){
     	message["header"] = create_common_header();
    	message["msg"] = create_common_msg();
 	message["data"]["size"] = chunk.size();
+	message["data"]["format"] = "int16";	
 	this->mosquitto_client.publish("audio/metadata", message.dump());	
 }
 

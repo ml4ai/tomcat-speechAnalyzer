@@ -28,7 +28,6 @@
 
 // Global variables
 #include "arguments.h"
-#include "spsc.h"
 #include "util.h"
 
 // Websocket Server files
@@ -81,6 +80,9 @@ int main(int argc, char* argv[]) {
             "ws_port",
             value<int>(&args.ws_port)->default_value(8888),
             "The port of the websocket server")(
+	    "sample_rate",
+	    value<int>(&args.sample_rate)->default_value(48000),
+	    "The sample rate of the input audio")(
             "disable_asr",
             value<bool>(&args.disable_asr)->default_value(false),
             "Disable the asr system of the speechAnalyzer agent")(
@@ -90,7 +92,10 @@ int main(int argc, char* argv[]) {
             "speechAnalyzer agent")(
             "disable_audio_writing",
             value<bool>(&args.disable_audio_writing)->default_value(false),
-            "Disable writing audio files for the speechAnalyzer agent");
+            "Disable writing audio files for the speechAnalyzer agent")(
+	    "disable_chunk_publishing",
+            value<bool>(&args.disable_chunk_publishing)->default_value(false),
+	    "Disable the publishing of audio chunks and chunk metadata to the message bus");
     }
     catch (const error& ex) {
         cout << "Error parsing arguments" << endl;
@@ -192,7 +197,7 @@ void read_chunks_websocket(Arguments args) {
 }
 
 void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>* queue){
-	int sample_rate = 44100;
+	int sample_rate = args.sample_rate;
 	int samples_done = 0;
 
 	// JsonBuilder object which will be passed to openSMILE log callback
