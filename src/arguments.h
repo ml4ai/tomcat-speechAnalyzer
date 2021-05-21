@@ -19,6 +19,6 @@ struct Arguments {
     bool disable_asr = false;
     bool disable_opensmile = true;
     bool disable_audio_writing = false;
-    bool disable_chunk_publishing = false;
-
+    bool disable_chunk_publishing = true;
+    bool disable_chunk_metadata_publishing = false;
 };

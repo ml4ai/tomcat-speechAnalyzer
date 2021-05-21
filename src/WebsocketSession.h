@@ -278,9 +278,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         }
 	
 	// Send chunk for raw audio message
+	string id = boost::uuids::to_string(boost::uuids::random_generator()());
 	if(!args.disable_chunk_publishing){
-		string id = boost::uuids::to_string(boost::uuids::random_generator()());
 		this->builder.process_audio_chunk_message(chunk, id);
+        }
+	if(!args.disable_chunk_metadata_publishing){
 		this->builder.process_audio_chunk_metadata_message(chunk, id);
         }
 

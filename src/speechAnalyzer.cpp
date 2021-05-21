@@ -94,8 +94,11 @@ int main(int argc, char* argv[]) {
             value<bool>(&args.disable_audio_writing)->default_value(false),
             "Disable writing audio files for the speechAnalyzer agent")(
 	    "disable_chunk_publishing",
-            value<bool>(&args.disable_chunk_publishing)->default_value(false),
-	    "Disable the publishing of audio chunks and chunk metadata to the message bus");
+            value<bool>(&args.disable_chunk_publishing)->default_value(true),
+	    "Disable the publishing of audio chunks to the message bus")(
+	    "disable_chunk_metadata_publishing",
+            value<bool>(&args.disable_chunk_metadata_publishing)->default_value(false),
+	    "Disable the publishing of audio chunk  metadata to the message bus");
     }
     catch (const error& ex) {
         cout << "Error parsing arguments" << endl;
@@ -215,7 +218,7 @@ void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boos
 	thread opensmile_thread(smile_run, handle);
 	
 	// Start speech streamer
-	SpeechWrapper* speech_handler = new SpeechWrapper(false);
+	SpeechWrapper* speech_handler = new SpeechWrapper(false, sample_rate);
 	speech_handler->start_stream();
 	process_real_cpu_clock::time_point stream_start =
 	process_real_cpu_clock::now(); // Need to know starting time to restart
@@ -267,7 +270,7 @@ void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boos
 		double sync_time = (double)samples_done / sample_rate;
 		builder.update_sync_time(sync_time);
 		// Create new stream
-		speech_handler = new SpeechWrapper(false);
+		speech_handler = new SpeechWrapper(false, sample_rate);
 		speech_handler->start_stream();
 		// Restart response reader thread
 		asr_reader_thread = thread(process_responses,
