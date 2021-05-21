@@ -6,6 +6,9 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 #include "JsonBuilder.h"
 #include "SpeechWrapper.h"
@@ -276,8 +279,9 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	
 	// Send chunk for raw audio message
 	if(!args.disable_chunk_publishing){
-		this->builder.process_audio_chunk_message(chunk);
-		this->builder.process_audio_chunk_metadata_message(chunk);
+		string id = boost::uuids::to_string(boost::uuids::random_generator()());
+		this->builder.process_audio_chunk_message(chunk, id);
+		this->builder.process_audio_chunk_metadata_message(chunk, id);
         }
 
 	// Set read_start

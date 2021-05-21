@@ -164,7 +164,7 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
     }
 }
 
-void JsonBuilder::process_audio_chunk_message(vector<char> chunk){
+void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id){
 	// Encode audio chunk
 	int encoded_data_length = Base64encode_len(chunk.size());
 	char output[encoded_data_length];
@@ -175,16 +175,18 @@ void JsonBuilder::process_audio_chunk_message(vector<char> chunk){
 	nlohmann::json message;
     	message["header"] = create_common_header();
    	message["msg"] = create_common_msg();
-	message["data"]["encoded"] = encoded;
+	message["data"]["encoded_chunk"] = encoded;
+	message["data"]["id"] = id;
 	this->mosquitto_client.publish("audio/chunk", message.dump());	
 }
 
-void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk){
+void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk, string id){
 	nlohmann::json message;
     	message["header"] = create_common_header();
    	message["msg"] = create_common_msg();
 	message["data"]["size"] = chunk.size();
-	message["data"]["format"] = "int16";	
+	message["data"]["format"] = "int16";
+	message["data"]["id"] = id;	
 	this->mosquitto_client.publish("audio/metadata", message.dump());	
 }
 

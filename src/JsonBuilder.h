@@ -34,8 +34,8 @@ class JsonBuilder {
         std::string id);
    
     // Process a audio chunk message
-    void process_audio_chunk_message(std::vector<char> chunk);
-    void process_audio_chunk_metadata_message(std::vector<char> chunk);
+    void process_audio_chunk_message(std::vector<char> chunk, std::string id);
+    void process_audio_chunk_metadata_message(std::vector<char> chunk, std::string id);
 
     // Update the sync time for word/feature alignment messages
     void update_sync_time(double sync_time);
