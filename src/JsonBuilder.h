@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "Mosquitto.h"
+#include "TrialListener.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <nlohmann/json.hpp>
 #include <smileapi/SMILEapi.h>
@@ -34,6 +35,7 @@ class JsonBuilder {
    
     // Process a audio chunk message
     void process_audio_chunk_message(std::vector<char> chunk);
+    void process_audio_chunk_metadata_message(std::vector<char> chunk);
 
     // Update the sync time for word/feature alignment messages
     void update_sync_time(double sync_time);
@@ -41,7 +43,7 @@ class JsonBuilder {
   private:
     // Mosquitto client objects
     Mosquitto mosquitto_client;
-    MosquittoListener listener_client;
+    TrialListener listener_client;
     std::thread listener_client_thread;
 
     // Data for handling openSMILE messages

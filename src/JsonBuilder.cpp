@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
-
+#include <chrono>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "JsonBuilder.h"
@@ -170,15 +170,24 @@ void JsonBuilder::process_audio_chunk_message(vector<char> chunk){
 	char output[encoded_data_length];
 	Base64encode(output, &chunk[0], chunk.size());
 	string encoded(output);
-
+	
 	// Create message
 	nlohmann::json message;
     	message["header"] = create_common_header();
    	message["msg"] = create_common_msg();
 	message["data"]["encoded"] = encoded;
 	message["data"]["format"] = "int16";	
-	this->mosquitto_client.publish("audio", message.dump());	
+	this->mosquitto_client.publish("audio/chunk", message.dump());	
 }
+
+void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk){
+	nlohmann::json message;
+    	message["header"] = create_common_header();
+   	message["msg"] = create_common_msg();
+	message["data"]["size"] = chunk.size();
+	this->mosquitto_client.publish("audio/metadata", message.dump());	
+}
+
 void JsonBuilder::update_sync_time(double sync_time) {
     this->sync_time = sync_time;
 }

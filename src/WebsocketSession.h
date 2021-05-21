@@ -250,7 +250,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
-        boost::ignore_unused(bytes_transferred);
+	boost::ignore_unused(bytes_transferred);
 
         // This indicates that the WebsocketSession was closed
         if (ec == ws::error::closed) {
@@ -273,9 +273,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	// Push chunk to queue for write_thread
 	while (!this->spsc_queue.push(chunk)) {
         }
-
+	
 	// Send chunk for raw audio message
 	this->builder.process_audio_chunk_message(chunk);
+	this->builder.process_audio_chunk_metadata_message(chunk);
         
 	// Set read_start
         if (!this->read_start) {
