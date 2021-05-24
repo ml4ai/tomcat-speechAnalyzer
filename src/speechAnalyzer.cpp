@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
             "mode",
             value<string>(&args.mode)->default_value("stdin"),
             "Where to read audio chunks from")(
-            "mqtt_host",
+            "mqtt_host,l",
             value<string>(&args.mqtt_host)->default_value("mosquitto"),
             "The host address of the mqtt broker")(
             "mqtt_port",
@@ -99,6 +99,10 @@ int main(int argc, char* argv[]) {
 	    "disable_chunk_metadata_publishing",
             value<bool>(&args.disable_chunk_metadata_publishing)->default_value(false),
 	    "Disable the publishing of audio chunk  metadata to the message bus");
+   	
+	    variables_map vm;
+	    store(parse_command_line(argc, argv, desc), vm); 
+  	    notify(vm);
     }
     catch (const error& ex) {
         cout << "Error parsing arguments" << endl;
@@ -202,6 +206,8 @@ void read_chunks_websocket(Arguments args) {
 void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>* queue){
 	int sample_rate = args.sample_rate;
 	int samples_done = 0;
+	bool is_float = true;
+	bool is_int16 = false;
 
 	// JsonBuilder object which will be passed to openSMILE log callback
 	JsonBuilder builder;
@@ -232,27 +238,37 @@ void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boos
 	StreamingRecognizeRequest content_request;
 	vector<char> chunk(8192);
 	while (queue->pop(chunk)) {
+		// Convert char vector to float and int16 vector
+		std::vector<float> float_chunk(chunk.size() / sizeof(float));
+                std::vector<int16_t> int_chunk(chunk.size() / sizeof(int16_t));
+                if (is_float) {
+                    memcpy(&float_chunk[0], &chunk[0], chunk.size());
+                    int_chunk.clear();
+                    for (float f : float_chunk) {
+                        int_chunk.push_back((int16_t)(f * 32768));
+                    }
+                }
+                else if (is_int16) {
+                    memcpy(&int_chunk[0], &chunk[0], chunk.size());
+                    float_chunk.clear();
+                    for (int i : int_chunk) {
+                        float_chunk.push_back((float)(i / 32768.0));
+                    }
+                }
+
 	    samples_done += 4096;
+
 	    // Write to opensmile
 	    while (true) {
 		smileres_t result = smile_extaudiosource_write_data(
 		    handle,
 		    "externalAudioSource",
-		    (void*)&chunk[0],
+		    (void*)&float_chunk[0],
 		    chunk.size() * sizeof(float));
 		if (result == SMILE_SUCCESS) {
 		    break;
 		}
 	    }
-
-	    // Convert 32f chunk to 16i chunk
-	    vector<int16_t> int_chunk;
-	    for (float f : chunk) {
-		int_chunk.push_back((int16_t)(f * 32768));
-	    }
-	    float_sample.write((char*)&chunk[0], sizeof(float) * chunk.size());
-	    int_sample.write((char*)&int_chunk[0],
-			     sizeof(int16_t) * int_chunk.size());
 
 	    // Write to google asr service
 	    speech_handler->send_chunk(int_chunk);
