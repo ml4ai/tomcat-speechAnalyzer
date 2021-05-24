@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_compile_definitions(BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
@@ -62,10 +64,12 @@ add_executable(speechAnalyzer
     src/speechAnalyzer.cpp
     src/JsonBuilder.cpp
     src/Mosquitto.cpp
+    src/TrialListener
     src/GlobalMosquittoListener.cpp
     src/SpeechWrapper.cpp
     src/util.cpp
     src/version.cpp
+    src/base64.c
 )
 
 target_link_libraries(

@@ -31,6 +31,9 @@ JsonBuilder::JsonBuilder() {
     this->listener_client.set_max_seconds_without_messages(
         2147483647); // Max Long value
     this->listener_client_thread = thread([this] { listener_client.loop(); });
+
+   // Set the start time for the stream
+   this->stream_start_time = boost::posix_time::microsec_clock::universal_time(); 
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -102,6 +105,25 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                     {"confidence", alternative.confidence()}}));
     }
     message["data"]["alternatives"] = alternatives;
+    
+    // Calculate timestamps
+    if(response.results(0).is_final()){
+	    auto utt = result.alternatives(0);
+	    WordInfo f = utt.words(0);
+	    WordInfo l = utt.words(utt.words().size()-1); 
+	    
+	    int64_t start_seconds = f.start_time().seconds();
+	    int32_t start_nanos = f.start_time().nanos();
+	    int64_t end_seconds = l.start_time().seconds();
+	    int32_t end_nanos = l.start_time().nanos();
+	    
+	    boost::posix_time::ptime start_timestamp = this->stream_start_time + boost::posix_time::seconds(start_seconds) + boost::posix_time::nanoseconds(start_nanos);
+	    boost::posix_time::ptime end_timestamp = this->stream_start_time + boost::posix_time::seconds(end_seconds) + boost::posix_time::nanoseconds(end_nanos);
+
+	    message["data"]["start_timestamp"] = boost::posix_time::to_iso_extended_string(start_timestamp) + "Z";
+	    message["data"]["end_timestamp"] = boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
+    }
+    // Publish message
     if (message["data"]["is_final"]) {
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
@@ -192,6 +214,7 @@ void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk, strin
 
 void JsonBuilder::update_sync_time(double sync_time) {
     this->sync_time = sync_time;
+   this->stream_start_time = boost::posix_time::microsec_clock::universal_time(); 
 }
 
 vector<nlohmann::json> JsonBuilder::features_between(double start_time,

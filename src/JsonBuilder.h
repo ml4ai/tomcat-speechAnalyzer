@@ -41,6 +41,9 @@ class JsonBuilder {
     void update_sync_time(double sync_time);
 
   private:
+    // Time object for start of stream
+    boost::posix_time::ptime stream_start_time;
+
     // Mosquitto client objects
     Mosquitto mosquitto_client;
     TrialListener listener_client;
