@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
             value<bool>(&args.disable_asr)->default_value(false),
             "Disable the asr system of the speechAnalyzer agent")(
             "disable_opensmile",
-            value<bool>(&args.disable_opensmile)->default_value(false),
+            value<bool>(&args.disable_opensmile)->default_value(true),
             "Disable the opensmile feature extraction system of the "
             "speechAnalyzer agent")(
             "disable_audio_writing",
