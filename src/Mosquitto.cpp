@@ -242,7 +242,11 @@ void MosquittoListener::on_message(const string& topic, const string& message) {
     if (m["msg"].contains("experiment_id")) {
         this->experiment_id = m["msg"]["experiment_id"];
     }
-    if(m["msg"].contains("participant_id")) {
-	this->participant_id = m ["msg"]["participant_id"];
+    if (m["data"].contains("client_info")) {
+/*	for(nlohmann::json client : m["data"]["client_info"]){
+		if(client["participantid"].compare(this->playername) == 0){ 
+			this->participant_id = client["participantid"];
+		}
+	}*/
     }
 }

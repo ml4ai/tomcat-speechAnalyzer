@@ -1,6 +1,6 @@
 #pragma once
 #include <thread>
-#include "Mosquitto.h"
+#include "TrialListener.h"
 
-extern MosquittoListener GLOBAL_LISTENER;
+extern TrialListener GLOBAL_LISTENER;
 extern std::thread GLOBAL_LISTENER_THREAD;
