@@ -59,6 +59,6 @@ class JsonBuilder {
                                                  double end_time);
 
     // Functions for creating cmomon message types
-    nlohmann::json create_common_header();
-    nlohmann::json create_common_msg();
+    nlohmann::json create_common_header(std::string message_type);
+    nlohmann::json create_common_msg(std::string sub_type);
 };

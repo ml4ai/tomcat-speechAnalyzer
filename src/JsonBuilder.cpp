@@ -52,8 +52,8 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
                 "agent/uaz/speechAnalyzer/vocalicFeatures",
                 opensmile_message.dump());
             this->opensmile_history.push_back(this->opensmile_message);
-            this->opensmile_message["header"] = create_common_header();
-            this->opensmile_message["msg"] = create_common_msg();
+            this->opensmile_message["header"] = create_common_header("observation");
+            this->opensmile_message["msg"] = create_common_msg("openSMILE");
             tmeta = false;
         }
         if (tmeta) {
@@ -85,9 +85,10 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
+
     nlohmann::json message;
-    message["header"] = create_common_header();
-    message["msg"] = create_common_msg();
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("asr");
 
     message["data"]["text"] = response.results(0).alternatives(0).transcript();
     message["data"]["is_final"] = response.results(0).is_final();
@@ -136,9 +137,11 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 // Data for handling word/feature alignment messages
 void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                             string id) {
+    
+
     nlohmann::json message;
-    message["header"] = create_common_header();
-    message["msg"] = create_common_msg();
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("alignment");
 
     auto result = response.results(0);
     for (int i = 0; i < result.alternatives_size(); i++) {
@@ -195,21 +198,25 @@ void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id){
 	
 	// Create message
 	nlohmann::json message;
-    	message["header"] = create_common_header();
-   	message["msg"] = create_common_msg();
+    	message["header"] = create_common_header("observation");
+   	message["msg"] = create_common_msg("audio_chunk");
 	message["data"]["chunk"] = encoded;
 	message["data"]["id"] = id;
 	this->mosquitto_client.publish("audio/chunk", message.dump());	
 }
 
 void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk, string id){
+    // Check if in trial
+    if (!GLOBAL_LISTENER.in_trial){
+	return;
+    }
 	nlohmann::json message;
-    	message["header"] = create_common_header();
-   	message["msg"] = create_common_msg();
+    	message["header"] = create_common_header("metadata");
+   	message["msg"] = create_common_msg("audio");
 	message["data"]["size"] = chunk.size();
 	message["data"]["format"] = "int16";
 	message["data"]["id"] = id;	
-	this->mosquitto_client.publish("audio/metadata", message.dump());	
+	this->mosquitto_client.publish("metadata/audio", message.dump());	
 }
 
 void JsonBuilder::update_sync_time(double sync_time) {
@@ -230,7 +237,7 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
 }
 
 // Methods for creating common message types
-nlohmann::json JsonBuilder::create_common_header() {
+nlohmann::json JsonBuilder::create_common_header(string message_type) {
     nlohmann::json header;
     string timestamp =
         boost::posix_time::to_iso_extended_string(
@@ -238,13 +245,13 @@ nlohmann::json JsonBuilder::create_common_header() {
         "Z";
 
     header["timestamp"] = timestamp;
-    header["message_type"] = "observation";
+    header["message_type"] = message_type;
     header["version"] = "0.1";
 
     return header;
 }
 
-nlohmann::json JsonBuilder::create_common_msg() {
+nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     nlohmann::json message;
     string timestamp =
         boost::posix_time::to_iso_extended_string(
@@ -256,7 +263,7 @@ nlohmann::json JsonBuilder::create_common_msg() {
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
     message["version"] = "0.1";
     message["source"] = "tomcat_speech_analyzer";
-    message["sub_type"] = "speech_analysis";
+    message["sub_type"] = sub_type;
 
     return message;
 }
