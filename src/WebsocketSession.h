@@ -84,7 +84,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
 
-	GLOBAL_LISTENER.playername = params["id"];
+	this->builder.participant_id = params["id"];
 
         // Set a decorator to change the server of the handshake
         this->ws_.set_option(
