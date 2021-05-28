@@ -2,6 +2,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <regex>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include "JsonBuilder.h"
@@ -48,9 +49,6 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-            this->mosquitto_client.publish(
-                "agent/uaz/speechAnalyzer/vocalicFeatures",
-                opensmile_message.dump());
             this->opensmile_history.push_back(this->opensmile_message);
             this->opensmile_message["header"] = create_common_header("observation");
             this->opensmile_message["msg"] = create_common_msg("openSMILE");
@@ -68,9 +66,18 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
         auto dot_index = temp.find('.');
         auto equals_index = temp.find('=');
         string field = temp.substr(dot_index + 1, equals_index - dot_index - 1);
-        double value = atof(temp.substr(equals_index + 1).c_str());
+	double value = atof(temp.substr(equals_index + 1).c_str());
 
-        this->opensmile_message["data"]["features"]["lld"][field] = value;
+	// Replace '[' and ']' characters 
+	size_t open = field.find("[");
+	size_t close = field.find("]");
+
+	if(open!=string::npos && close!=string::npos){	
+		field.replace(open, 1, "(");
+		field.replace(close, 1, ")");
+	}
+
+	this->opensmile_message["data"]["features"]["lld"][field] = value;
         if (!count(
                 this->feature_list.begin(), this->feature_list.end(), field)) {
             feature_list.push_back(field);
@@ -93,7 +100,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     message["data"]["text"] = response.results(0).alternatives(0).transcript();
     message["data"]["is_final"] = response.results(0).is_final();
     message["data"]["asr_system"] = "google";
-    message["data"]["participant_id"] = GLOBAL_LISTENER.participant_id;
+    message["data"]["participant_id"] = this->participant_id;
     message["data"]["id"] = id;
 
     // Add transcription alternatvies
@@ -181,10 +188,9 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             message["data"]["start_time"] = start_time;
             message["data"]["end_time"] = end_time;
             message["data"]["features"] = features_output;
-            message["data"]["git_commit"] = string(GIT_COMMIT);
             message["data"]["id"] = id;
             message["data"]["time_interval"] = 0.01;
-            this->mosquitto_client.publish("word/feature", message.dump());
+	    this->mosquitto_client.publish("word/feature", message.dump());
         }
     }
 }

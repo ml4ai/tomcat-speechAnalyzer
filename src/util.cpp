@@ -36,5 +36,6 @@ void process_responses(
         string id = boost::uuids::to_string(boost::uuids::random_generator()());
         // Process messages
         builder->process_asr_message(response, id);
+	builder->process_alignment_message(response, id);
     }
 }

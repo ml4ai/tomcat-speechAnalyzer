@@ -5,6 +5,7 @@
 #include <chrono>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
+#include <boost/log/trivial.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -66,7 +67,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     // Start the asynchronous accept operation
     template <class Body, class Allocator>
     void do_accept(http::request<Body, http::basic_fields<Allocator>> request) {
-
         using ranges::to;
         using ranges::views::split, ranges::views::drop;
 
@@ -106,7 +106,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         // Wait for writes to start
         while (!this->read_start) {
         }
-
         ofstream float_sample("float_sample_" + this->participant_id,
                               std::ios::out | std::ios::binary |
                                   std::ios::trunc);
@@ -202,10 +201,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void on_accept(beast::error_code ec) {
-        if (ec) {
+	std::cout << "Accepted connection" << std::endl;
+	if (ec) {
             return fail(ec, "accept");
         }
-        std::cout << "Accepted connection" << std::endl;
         // Initialize openSMILE
         if (!this->args.disable_opensmile) {
             this->handle = smile_new();
@@ -234,9 +233,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                             &(this->builder));
         }
         this->consumer_thread = std::thread([this] { this->write_thread(); });
-
         // Read a message
-        this->do_read();
+	this->do_read();
     }
 
     void do_read() {
@@ -254,11 +252,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
 	boost::ignore_unused(bytes_transferred);
-
-        // This indicates that the WebsocketSession was closed
-        if (ec == ws::error::closed) {
-            this->read_done = true;
-        }
 
         if (ec) {
             this->read_done = true;
