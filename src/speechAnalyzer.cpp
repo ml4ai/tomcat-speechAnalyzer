@@ -15,7 +15,8 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/console.hpp>
 // Third Party Libraries
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
@@ -60,6 +61,9 @@ Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
 
 int main(int argc, char* argv[]) {
+    // Enable Boost logging
+    boost::log::add_console_log(std::cout, boost::log::keywords::auto_flush = true);    
+
     // Handle options
     Arguments args;
     try {
@@ -119,7 +123,7 @@ int main(int argc, char* argv[]) {
         2147483647); // Max Long value
     GLOBAL_LISTENER_THREAD = thread([] { GLOBAL_LISTENER.loop(); });
 
-
+    BOOST_LOG_TRIVIAL(info) << "Starting speechAnalyzer in " << args.mode << " mode";
     if (args.mode.compare("stdin") == 0) { 
 	thread thread_object(read_chunks_stdin, args);
         thread_object.join();
@@ -176,7 +180,6 @@ void read_chunks_mqtt(Arguments args){
 	chunk_listener.loop();*/
 }
 void read_chunks_websocket(Arguments args) {
-    cout << "Starting Websocket Server" << endl;
     auto const address = asio::ip::make_address(args.ws_host);
     auto const port = static_cast<unsigned short>(args.ws_port);
     auto const doc_root = make_shared<string>(".");

@@ -222,6 +222,7 @@ void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk, strin
 	message["data"]["size"] = chunk.size();
 	message["data"]["format"] = "int16";
 	message["data"]["id"] = id;	
+	message["data"]["participant_id"] = this->participant_id;
 	this->mosquitto_client.publish("metadata/audio", message.dump());	
 }
 
