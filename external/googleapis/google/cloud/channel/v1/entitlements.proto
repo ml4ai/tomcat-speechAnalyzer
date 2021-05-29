@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -204,17 +204,14 @@ message TrialSettings {
 // provisioned services for a customer that they do not own.
 // Read-only.
 message TransferableSku {
-  // Whether a transferable SKU is commitment-based or not.
-  google.protobuf.BoolValue is_commitment = 6;
-
-  // Commitment end timestamp.
-  google.protobuf.Timestamp commitment_end_timestamp = 7;
-
   // Describes the transfer eligibility of a SKU.
   TransferEligibility transfer_eligibility = 9;
 
   // The SKU pertaining to the provisioning resource as specified in the Offer.
   Sku sku = 11;
+
+  // Optional. The customer to transfer has an entitlement with the populated legacy SKU.
+  Sku legacy_sku = 12 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Specifies transfer eligibility of a SKU.

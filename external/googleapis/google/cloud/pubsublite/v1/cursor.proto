@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,6 +44,10 @@ service CursorService {
 
   // Updates the committed cursor.
   rpc CommitCursor(CommitCursorRequest) returns (CommitCursorResponse) {
+    option (google.api.http) = {
+      post: "/v1/cursor/{subscription=projects/*/locations/*/subscriptions/*}:commitCursor"
+      body: "*"
+    };
   }
 
   // Returns all committed cursor information for a subscription.

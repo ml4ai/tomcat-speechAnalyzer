@@ -27,6 +27,8 @@ import "google/protobuf/struct.proto";
 option go_package = "google.golang.org/genproto/googleapis/home/graph/v1;graph";
 option java_outer_classname = "HomeGraphApiServiceProto";
 option java_package = "com.google.home.graph.v1";
+option php_namespace = "Google\\Home\\Graph\\V1";
+
 option (google.api.resource_definition) = {
   type: "homegraph.googleapis.com/AgentUserPath"
   pattern: "agentUsers/{agent_user_path=**}"
@@ -194,10 +196,11 @@ message ReportStateAndNotificationRequest {
   // Required. Third-party user ID.
   string agent_user_id = 2 [(google.api.field_behavior) = REQUIRED];
 
-  // Token to maintain state in the follow up notification response.
-  // Deprecated. See the [notifications
-  // guide](https://developers.google.com/assistant/smarthome/develop/notifications)
-  // for details on implementing follow up notifications.
+  // Deprecated.
+  // (-- Token to maintain state in the follow up notification response. See the
+  // notifications guide at
+  // https://developers.google.com/assistant/smarthome/develop/notifications for
+  // details on implementing follow up notifications --)
   string follow_up_token = 5 [deprecated = true];
 
   // Required. State of devices to update and notification metadata for devices.

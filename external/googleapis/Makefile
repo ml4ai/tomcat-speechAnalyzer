@@ -13,10 +13,10 @@ OUTPUT ?= ./gens
 LANGUAGE ?= cpp
 
 # Choose grpc plugin
-GRPCPLUGIN ?= /opt/local/bin/grpc_$(LANGUAGE)_plugin
+GRPCPLUGIN ?= /usr/local/bin/grpc_$(LANGUAGE)_plugin
 
 # Choose the proto include directory.
-PROTOINCLUDE ?= /opt/local/include
+PROTOINCLUDE ?= /usr/local/include
 
 # Choose protoc binary
 PROTOC ?= protoc
@@ -36,12 +36,12 @@ FLAGS+=	--plugin=protoc-gen-grpc=$(GRPCPLUGIN)
 
 SUFFIX:= pb.cc
 
-DEPS:= $(shell find google/rpc $(PROTOINCLUDE)/google/protobuf -type f -name '*.proto' | sed "s/proto$$/$(SUFFIX)/")
+DEPS:= $(shell find google $(PROTOINCLUDE)/google/protobuf -type f -name '*.proto' | sed "s/proto$$/$(SUFFIX)/")
 
 all: $(DEPS)
 
 %.$(SUFFIX):  %.proto
-	@mkdir -p $(OUTPUT)
+	mkdir -p $(OUTPUT)
 	$(PROTOC) $(FLAGS) $*.proto
 
 clean:

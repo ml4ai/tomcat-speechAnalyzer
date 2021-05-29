@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -199,7 +199,7 @@ message Intent {
   // fallback intents act as negative examples that triggers no-match event.
   bool is_fallback = 6;
 
-  // Optional. The key/value metadata to label an intent. Labels can contain
+  // The key/value metadata to label an intent. Labels can contain
   // lowercase letters, digits and the symbols '-' and '_'. International
   // characters are allowed, including letters from unicase alphabets. Keys must
   // start with a letter. Keys and values can be no longer than 63 characters
@@ -211,11 +211,11 @@ message Intent {
   // * sys.contextual
   // The above labels do not require value. "sys.head" means the intent is a
   // head intent. "sys.contextual" means the intent is a contextual intent.
-  map<string, string> labels = 7 [(google.api.field_behavior) = OPTIONAL];
+  map<string, string> labels = 7;
 
-  // Optional. Human readable description for better understanding an intent like its
+  // Human readable description for better understanding an intent like its
   // scope, content, result etc. Maximum character limit: 140 characters.
-  string description = 8 [(google.api.field_behavior) = OPTIONAL];
+  string description = 8;
 }
 
 // The request message for [Intents.ListIntents][google.cloud.dialogflow.cx.v3.Intents.ListIntents].
@@ -236,7 +236,7 @@ message ListIntentsRequest {
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 2;
@@ -282,7 +282,7 @@ message GetIntentRequest {
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 2;
@@ -308,7 +308,7 @@ message CreateIntentRequest {
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 3;
@@ -325,7 +325,7 @@ message UpdateIntentRequest {
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 2;

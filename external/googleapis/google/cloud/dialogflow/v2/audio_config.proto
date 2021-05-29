@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,6 +28,36 @@ option java_multiple_files = true;
 option java_outer_classname = "AudioConfigProto";
 option java_package = "com.google.cloud.dialogflow.v2";
 option objc_class_prefix = "DF";
+
+// Hints for the speech recognizer to help with recognition in a specific
+// conversation state.
+message SpeechContext {
+  // Optional. A list of strings containing words and phrases that the speech
+  // recognizer should recognize with higher likelihood.
+  //
+  // This list can be used to:
+  //
+  // * improve accuracy for words and phrases you expect the user to say,
+  //   e.g. typical commands for your Dialogflow agent
+  // * add additional words to the speech recognizer vocabulary
+  // * ...
+  //
+  // See the [Cloud Speech
+  // documentation](https://cloud.google.com/speech-to-text/quotas) for usage
+  // limits.
+  repeated string phrases = 1;
+
+  // Optional. Boost for this context compared to other contexts:
+  //
+  // * If the boost is positive, Dialogflow will increase the probability that
+  //   the phrases in this context are recognized over similar sounding phrases.
+  // * If the boost is unspecified or non-positive, Dialogflow will not apply
+  //   any boost.
+  //
+  // Dialogflow recommends that you use boosts in the range (0, 20] and that you
+  // find a value that fits your use case with binary search.
+  float boost = 2;
+}
 
 // Audio encoding of the audio content sent in the conversational query request.
 // Refer to the
@@ -76,36 +106,6 @@ enum AudioEncoding {
   // is replaced with a single byte containing the block length. Only Speex
   // wideband is supported. `sample_rate_hertz` must be 16000.
   AUDIO_ENCODING_SPEEX_WITH_HEADER_BYTE = 7;
-}
-
-// Hints for the speech recognizer to help with recognition in a specific
-// conversation state.
-message SpeechContext {
-  // Optional. A list of strings containing words and phrases that the speech
-  // recognizer should recognize with higher likelihood.
-  //
-  // This list can be used to:
-  //
-  // * improve accuracy for words and phrases you expect the user to say,
-  //   e.g. typical commands for your Dialogflow agent
-  // * add additional words to the speech recognizer vocabulary
-  // * ...
-  //
-  // See the [Cloud Speech
-  // documentation](https://cloud.google.com/speech-to-text/quotas) for usage
-  // limits.
-  repeated string phrases = 1;
-
-  // Optional. Boost for this context compared to other contexts:
-  //
-  // * If the boost is positive, Dialogflow will increase the probability that
-  //   the phrases in this context are recognized over similar sounding phrases.
-  // * If the boost is unspecified or non-positive, Dialogflow will not apply
-  //   any boost.
-  //
-  // Dialogflow recommends that you use boosts in the range (0, 20] and that you
-  // find a value that fits your use case with binary search.
-  float boost = 2;
 }
 
 // Information for a word recognized by the speech recognizer.
@@ -247,6 +247,12 @@ message InputAudioConfig {
   // Note: When specified, InputAudioConfig.single_utterance takes precedence
   // over StreamingDetectIntentRequest.single_utterance.
   bool single_utterance = 8;
+
+  // Only used in [Participants.AnalyzeContent][google.cloud.dialogflow.v2.Participants.AnalyzeContent] and
+  // [Participants.StreamingAnalyzeContent][google.cloud.dialogflow.v2.Participants.StreamingAnalyzeContent].
+  // If `false` and recognition doesn't return any result, trigger
+  // `NO_SPEECH_RECOGNIZED` event to Dialogflow agent.
+  bool disable_no_speech_recognized_event = 14;
 }
 
 // Description of which voice to use for speech synthesis.
@@ -262,23 +268,6 @@ message VoiceSelectionParams {
   // voice of the appropriate gender is not available, the synthesizer should
   // substitute a voice with a different gender rather than failing the request.
   SsmlVoiceGender ssml_gender = 2;
-}
-
-// Gender of the voice as described in
-// [SSML voice element](https://www.w3.org/TR/speech-synthesis11/#edef_voice).
-enum SsmlVoiceGender {
-  // An unspecified gender, which means that the client doesn't care which
-  // gender the selected voice will have.
-  SSML_VOICE_GENDER_UNSPECIFIED = 0;
-
-  // A male voice.
-  SSML_VOICE_GENDER_MALE = 1;
-
-  // A female voice.
-  SSML_VOICE_GENDER_FEMALE = 2;
-
-  // A gender-neutral voice.
-  SSML_VOICE_GENDER_NEUTRAL = 3;
 }
 
 // Configuration of how speech should be synthesized.
@@ -313,6 +302,23 @@ message SynthesizeSpeechConfig {
   VoiceSelectionParams voice = 4;
 }
 
+// Gender of the voice as described in
+// [SSML voice element](https://www.w3.org/TR/speech-synthesis11/#edef_voice).
+enum SsmlVoiceGender {
+  // An unspecified gender, which means that the client doesn't care which
+  // gender the selected voice will have.
+  SSML_VOICE_GENDER_UNSPECIFIED = 0;
+
+  // A male voice.
+  SSML_VOICE_GENDER_MALE = 1;
+
+  // A female voice.
+  SSML_VOICE_GENDER_FEMALE = 2;
+
+  // A gender-neutral voice.
+  SSML_VOICE_GENDER_NEUTRAL = 3;
+}
+
 // Instructs the speech synthesizer on how to generate the output audio content.
 // If this audio config is supplied in a request, it overrides all existing
 // text-to-speech settings applied to the agent.
@@ -331,6 +337,15 @@ message OutputAudioConfig {
   SynthesizeSpeechConfig synthesize_speech_config = 3;
 }
 
+// Configures speech transcription for [ConversationProfile][google.cloud.dialogflow.v2.ConversationProfile].
+message SpeechToTextConfig {
+  // Optional. The speech model used in speech to text.
+  // `SPEECH_MODEL_VARIANT_UNSPECIFIED`, `USE_BEST_AVAILABLE` will be treated as
+  // `USE_ENHANCED`. It can be overridden in [AnalyzeContentRequest][google.cloud.dialogflow.v2.AnalyzeContentRequest] and
+  // [StreamingAnalyzeContentRequest][google.cloud.dialogflow.v2.StreamingAnalyzeContentRequest] request.
+  SpeechModelVariant speech_model_variant = 1 [(google.api.field_behavior) = OPTIONAL];
+}
+
 // Audio encoding of the output audio format in Text-To-Speech.
 enum OutputAudioEncoding {
   // Not specified.
@@ -343,9 +358,15 @@ enum OutputAudioEncoding {
   // MP3 audio at 32kbps.
   OUTPUT_AUDIO_ENCODING_MP3 = 2;
 
+  // MP3 audio at 64kbps.
+  OUTPUT_AUDIO_ENCODING_MP3_64_KBPS = 4;
+
   // Opus encoded audio wrapped in an ogg container. The result will be a
   // file which can be played natively on Android, and in browsers (at least
   // Chrome and Firefox). The quality of the encoding is considerably higher
   // than MP3 while using approximately the same bitrate.
   OUTPUT_AUDIO_ENCODING_OGG_OPUS = 3;
+
+  // 8-bit samples that compand 14-bit audio samples using G.711 PCMU/mu-law.
+  OUTPUT_AUDIO_ENCODING_MULAW = 5;
 }
