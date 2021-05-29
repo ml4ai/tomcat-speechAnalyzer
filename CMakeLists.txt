@@ -25,29 +25,6 @@ find_package(SMILEapi REQUIRED)
 find_package(Mosquitto REQUIRED)
 find_package(range-v3 REQUIRED)
 
-# ---------------------------------------------------------------------
-# Process git version information
-# ---------------------------------------------------------------------
-
-execute_process(COMMAND git rev-parse HEAD
-		OUTPUT_VARIABLE GIT_COMMIT
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		ERROR_QUIET)
-
-set(VERSION "const char* GIT_COMMIT=\"${GIT_COMMIT}\";")
-
-string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp)
-	file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp VERSION_)
-else()
-	set(VERSION_ "")
-endif()
-
-if (NOT "${VERSION}" STREQUAL "${VERSION_}")
-    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp "${VERSION}")
-endif()
-
-# ----------------------------------------------------------------------
 
 option(BUILD_GOOGLE_CLOUD_SPEECH_LIB "Build google_cloud_speech library" ON)
 
