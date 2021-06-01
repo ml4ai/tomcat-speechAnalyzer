@@ -21,7 +21,7 @@
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
 #include "GlobalMosquittoListener.h"
-//#include "ChunkListener.h"
+#include "ChunkListener.h"
 #include "SpeechWrapper.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
@@ -166,18 +166,27 @@ void read_chunks_stdin(Arguments args) {
 
 void read_chunks_mqtt(Arguments args){
 	//TODO: Implement replay of published chunks
-	/* 
-	// Wait for write_thread to start	
-	while(!write_start) {
-	}
+	int num_participants = 4;
+	vector<boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>> participant_queues(num_participants);
+	vector<ChunkListener> chunk_listeners;
+	vector<thread> read_threads;	
+	vector<thread> write_threads;
+	// Create listener clients for each participant
+	for(int i=0;i<num_participants;i++){
+		ChunkListener listener("test", &participant_queues[i]);
+		listener.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
+		listener.set_max_seconds_without_messages(2137483647);
+		listener.subscribe("audio");
 		
-	// Initialize  mqtt listener for audio chunk messages
-	ChunkListener chunk_listener(queue);  
-	chunk_listener.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-	chunk_listener.set_max_seconds_without_message(2137483647);
-
-	// Start listening for chunks
-	chunk_listener.loop();*/
+		chunk_listeners.push_back(listener);
+	}
+	// Start read/write threads for each participant
+	for(int i=0;i<num_participants;i++){
+		read_threads.push_back(thread([&](){chunk_listeners[i].loop();}));
+		write_threads.push_back(thread(write_thread, args, &participant_queues[i]));
+	}
+	 
+	while(true);		
 }
 void read_chunks_websocket(Arguments args) {
     auto const address = asio::ip::make_address(args.ws_host);

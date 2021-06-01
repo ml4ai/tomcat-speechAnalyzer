@@ -41,7 +41,8 @@ add_executable(speechAnalyzer
     src/speechAnalyzer.cpp
     src/JsonBuilder.cpp
     src/Mosquitto.cpp
-    src/TrialListener
+    src/TrialListener.cpp
+    src/ChunkListener.cpp
     src/GlobalMosquittoListener.cpp
     src/SpeechWrapper.cpp
     src/util.cpp
