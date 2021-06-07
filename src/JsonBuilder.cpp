@@ -4,7 +4,9 @@
 #include <chrono>
 #include <regex>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
 #include "GlobalMosquittoListener.h"
@@ -188,7 +190,8 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             message["data"]["start_time"] = start_time;
             message["data"]["end_time"] = end_time;
             message["data"]["features"] = features_output;
-            message["data"]["id"] = id;
+            message["data"]["utterance_id"] = id;
+	    message["data"]["id"] = boost::uuids::to_string(boost::uuids::random_generator()()); 
             message["data"]["time_interval"] = 0.01;
 	    this->mosquitto_client.publish("word/feature", message.dump());
         }

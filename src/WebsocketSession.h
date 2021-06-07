@@ -109,18 +109,21 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         // Initialize openSMILE
         if (!this->args.disable_opensmile) {
 	    BOOST_LOG_TRIVIAL(info) << "Initializing openSMILE system";
-            this->handle = smile_new();
+            OPENSMILE_MUTEX.lock();
+	    this->handle = smile_new();
+	    smileopt_t *options = NULL;
             smile_initialize(this->handle,
                              "conf/is09-13/IS13_ComParE.conf",
                              0,
-                             nullptr,
+                             options,
                              1,
                              0,
                              0,
                              0);
             smile_set_log_callback(
                 this->handle, &log_callback, &(this->builder));
-            this->opensmile_thread = std::thread(smile_run, this->handle);
+            this->opensmile_thread = std::thread(smile_run, this->handle);	
+	    OPENSMILE_MUTEX.unlock();
         }
         // Initialize Speech Session
         if (!this->args.disable_asr) {
