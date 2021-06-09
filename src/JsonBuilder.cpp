@@ -97,7 +97,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 
     nlohmann::json message;
     message["header"] = create_common_header("observation");
-    message["msg"] = create_common_msg("asr");
+    message["msg"] = create_common_msg("asr:transcription");
 
     message["data"]["text"] = response.results(0).alternatives(0).transcript();
     message["data"]["is_final"] = response.results(0).is_final();
@@ -150,7 +150,7 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
 
     nlohmann::json message;
     message["header"] = create_common_header("observation");
-    message["msg"] = create_common_msg("alignment");
+    message["msg"] = create_common_msg("asr:alignment");
 
     auto result = response.results(0);
     for (int i = 0; i < result.alternatives_size(); i++) {
@@ -189,12 +189,12 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             message["data"]["word"] = current_word;
             message["data"]["start_time"] = start_time;
             message["data"]["end_time"] = end_time;
-            message["data"]["features"] = features_output;
+            message["data"]["features"] = features_output.dump();
             message["data"]["utterance_id"] = id;
 	    message["data"]["id"] = boost::uuids::to_string(boost::uuids::random_generator()()); 
             message["data"]["time_interval"] = 0.01;
-	    this->mosquitto_client.publish("word/feature", message.dump());
-        }
+	    this->mosquitto_client.publish("agent/asr/word_alignment", message.dump());
+	}
     }
 }
 
@@ -226,7 +226,7 @@ void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk, strin
 	message["data"]["format"] = "int16";
 	message["data"]["id"] = id;	
 	message["data"]["participant_id"] = this->participant_id;
-	this->mosquitto_client.publish("metadata/audio", message.dump());	
+	this->mosquitto_client.publish("agent/asr/metadata", message.dump());	
 }
 
 void JsonBuilder::update_sync_time(double sync_time) {
