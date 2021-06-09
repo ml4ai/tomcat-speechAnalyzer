@@ -50,6 +50,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     process_real_cpu_clock::time_point stream_start;
     int samples_done = 0;
     int sample_rate = 48000;
+    int samples_per_chunk = 4096;
     bool read_done = false;
     std::string participant_id;
 
@@ -144,16 +145,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
     void write_thread() {
-        /*ofstream float_sample("float_sample_" + this->participant_id,
-                              std::ios::out | std::ios::binary |
-                                  std::ios::trunc);
-        ofstream int_sample("int_sample_" + this->participant_id,
-                            std::ios::out | std::ios::binary | std::ios::trunc);*/
         StreamingRecognizeRequest content_request;
-        std::vector<char> chunk(16384);
+        std::vector<char> chunk(8192);
         while (!this->read_done) {
             while (spsc_queue.pop(chunk)) {
-                this->samples_done += 8096;
+                this->samples_done += 4096;
 
                 // Create f32 and i16 chunks
                 std::vector<float> float_chunk(chunk.size() / sizeof(float));
@@ -173,13 +169,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     }
                 }
 
-                // Write raw audio files
-                /*if (!this->args.disable_audio_writing) {
-                    float_sample.write((char*)&float_chunk[0],
-                                       sizeof(float) * float_chunk.size());
-                    int_sample.write((char*)&chunk[0],
-                                     sizeof(int16_t) * chunk.size());
-                }*/
 
                 // Write to google asr service
                 if (!this->args.disable_asr) {
@@ -224,10 +213,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
             }
         }
-        /*float_sample.close();
-        int_sample.close();
-	*/
-        this->speech_handler->send_writes_done();
+        
+	this->speech_handler->send_writes_done();
         this->asr_reader_thread.join();
         this->speech_handler->finish_stream();
 
