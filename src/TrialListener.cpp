@@ -15,13 +15,7 @@ void TrialListener::on_message(const string& topic, const string& message) {
     if (m["msg"].contains("experiment_id")) {
         this->experiment_id = m["msg"]["experiment_id"];
     }
-    if (m["data"].contains("client_info")) {
-        /*	for(nlohmann::json client : m["data"]["client_info"]){
-                        if(client["participantid"].compare(this->playername) ==
-           0){ this->participant_id = client["participantid"];
-                        }
-                }*/
-    }
+    
     // Check if trial has started
     std::string sub_type = m["msg"]["sub_type"];
     if (sub_type.compare("start") == 0) {
