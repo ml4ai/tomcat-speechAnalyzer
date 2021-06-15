@@ -3,25 +3,25 @@
 #include <cstring> //strerror
 #include <fstream>
 #include <iostream>
+#include <smileapi/SMILEapi.h>
 #include <string>
 #include <thread>
 #include <vector>
-#include <smileapi/SMILEapi.h>
 
 // Boost
 #include <boost/chrono.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include <boost/program_options.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/console.hpp>
 // Third Party Libraries
+#include "ChunkListener.h"
+#include "GlobalMosquittoListener.h"
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
-#include "GlobalMosquittoListener.h"
-#include "ChunkListener.h"
 #include "SpeechWrapper.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
@@ -33,7 +33,9 @@
 
 // Websocket Server files
 #include "WebsocketSession.h"
+
 #include "HTTPSession.h"
+
 #include "Listener.h"
 
 namespace beast = boost::beast;
@@ -55,14 +57,18 @@ using namespace std;
 void read_chunks_stdin(Arguments args);
 void read_chunks_websocket(Arguments args);
 void read_chunks_mqtt(Arguments args);
-void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>* queue);
+void write_thread(
+    Arguments args,
+    boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>*
+        queue);
 
 Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
 
 int main(int argc, char* argv[]) {
     // Enable Boost logging
-    boost::log::add_console_log(std::cout, boost::log::keywords::auto_flush = true);    
+    boost::log::add_console_log(std::cout,
+                                boost::log::keywords::auto_flush = true);
 
     // Handle options
     Arguments args;
@@ -84,9 +90,9 @@ int main(int argc, char* argv[]) {
             "ws_port",
             value<int>(&args.ws_port)->default_value(8888),
             "The port of the websocket server")(
-	    "sample_rate",
-	    value<int>(&args.sample_rate)->default_value(48000),
-	    "The sample rate of the input audio")(
+            "sample_rate",
+            value<int>(&args.sample_rate)->default_value(48000),
+            "The sample rate of the input audio")(
             "disable_asr",
             value<bool>(&args.disable_asr)->default_value(false),
             "Disable the asr system of the speechAnalyzer agent")(
@@ -97,16 +103,18 @@ int main(int argc, char* argv[]) {
             "disable_audio_writing",
             value<bool>(&args.disable_audio_writing)->default_value(false),
             "Disable writing audio files for the speechAnalyzer agent")(
-	    "disable_chunk_publishing",
+            "disable_chunk_publishing",
             value<bool>(&args.disable_chunk_publishing)->default_value(true),
-	    "Disable the publishing of audio chunks to the message bus")(
-	    "disable_chunk_metadata_publishing",
-            value<bool>(&args.disable_chunk_metadata_publishing)->default_value(false),
-	    "Disable the publishing of audio chunk  metadata to the message bus");
-   	
-	    variables_map vm;
-	    store(parse_command_line(argc, argv, desc), vm); 
-  	    notify(vm);
+            "Disable the publishing of audio chunks to the message bus")(
+            "disable_chunk_metadata_publishing",
+            value<bool>(&args.disable_chunk_metadata_publishing)
+                ->default_value(false),
+            "Disable the publishing of audio chunk  metadata to the message "
+            "bus");
+
+        variables_map vm;
+        store(parse_command_line(argc, argv, desc), vm);
+        notify(vm);
     }
     catch (const error& ex) {
         cout << "Error parsing arguments" << endl;
@@ -116,30 +124,31 @@ int main(int argc, char* argv[]) {
     WebsocketSession::args = args;
 
     // Setup Global Listener
-    GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000,1000,1000);
+    GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
     GLOBAL_LISTENER.subscribe("trial");
     GLOBAL_LISTENER.subscribe("experiment");
     GLOBAL_LISTENER.set_max_seconds_without_messages(
         2147483647); // Max Long value
     GLOBAL_LISTENER_THREAD = thread([] { GLOBAL_LISTENER.loop(); });
 
-    BOOST_LOG_TRIVIAL(info) << "Starting speechAnalyzer in " << args.mode << " mode";
-    if (args.mode.compare("stdin") == 0) { 
-	thread thread_object(read_chunks_stdin, args);
+    BOOST_LOG_TRIVIAL(info)
+        << "Starting speechAnalyzer in " << args.mode << " mode";
+    if (args.mode.compare("stdin") == 0) {
+        thread thread_object(read_chunks_stdin, args);
         thread_object.join();
     }
     else if (args.mode.compare("websocket") == 0) {
         thread thread_object(read_chunks_websocket, args);
         thread_object.join();
     }
-    else if (args.mode.compare("mqtt") == 0){
+    else if (args.mode.compare("mqtt") == 0) {
         thread thread_object(read_chunks_mqtt, args);
         thread_object.join();
     }
     else {
         cout << "Unknown mode" << endl;
     }
-    
+
     // Join Global Listener
     GLOBAL_LISTENER.close();
     GLOBAL_LISTENER_THREAD.join();
@@ -149,7 +158,8 @@ int main(int argc, char* argv[]) {
 
 void read_chunks_stdin(Arguments args) {
     // Create spsc queue
-    boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>> queue;
+    boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>
+        queue;
     thread consumer_thread(write_thread, args, &queue);
 
     freopen(nullptr, "rb", stdin); // reopen stdin in binary mode
@@ -161,32 +171,36 @@ void read_chunks_stdin(Arguments args) {
         } // If queue is full it will keep trying until avaliable space
     }
 
-   consumer_thread.join();
+    consumer_thread.join();
 }
 
-void read_chunks_mqtt(Arguments args){
-	//TODO: Implement replay of published chunks
-	int num_participants = 4;
-	vector<boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>> participant_queues(num_participants);
-	vector<ChunkListener> chunk_listeners;
-	vector<thread> read_threads;	
-	vector<thread> write_threads;
-	// Create listener clients for each participant
-	for(int i=0;i<num_participants;i++){
-		ChunkListener listener("test", &participant_queues[i]);
-		listener.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-		listener.set_max_seconds_without_messages(2137483647);
-		listener.subscribe("audio");
-		
-		chunk_listeners.push_back(listener);
-	}
-	// Start read/write threads for each participant
-	for(int i=0;i<num_participants;i++){
-		read_threads.push_back(thread([&](){chunk_listeners[i].loop();}));
-		write_threads.push_back(thread(write_thread, args, &participant_queues[i]));
-	}
-	 
-	while(true);		
+void read_chunks_mqtt(Arguments args) {
+    // TODO: Implement replay of published chunks
+    int num_participants = 4;
+    vector<boost::lockfree::spsc_queue<vector<char>,
+                                       boost::lockfree::capacity<1024>>>
+        participant_queues(num_participants);
+    vector<ChunkListener> chunk_listeners;
+    vector<thread> read_threads;
+    vector<thread> write_threads;
+    // Create listener clients for each participant
+    for (int i = 0; i < num_participants; i++) {
+        ChunkListener listener("test", &participant_queues[i]);
+        listener.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
+        listener.set_max_seconds_without_messages(2137483647);
+        listener.subscribe("audio");
+
+        chunk_listeners.push_back(listener);
+    }
+    // Start read/write threads for each participant
+    for (int i = 0; i < num_participants; i++) {
+        read_threads.push_back(thread([&]() { chunk_listeners[i].loop(); }));
+        write_threads.push_back(
+            thread(write_thread, args, &participant_queues[i]));
+    }
+
+    while (true)
+        ;
 }
 void read_chunks_websocket(Arguments args) {
     auto const address = asio::ip::make_address(args.ws_host);
@@ -215,106 +229,107 @@ void read_chunks_websocket(Arguments args) {
     }
 }
 
-void write_thread(Arguments args, boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>* queue){
-	int sample_rate = args.sample_rate;
-	int samples_done = 0;
-	bool is_float = true;
-	bool is_int16 = false;
+void write_thread(
+    Arguments args,
+    boost::lockfree::spsc_queue<vector<char>, boost::lockfree::capacity<1024>>*
+        queue) {
+    int sample_rate = args.sample_rate;
+    int samples_done = 0;
+    bool is_float = true;
+    bool is_int16 = false;
 
-	// JsonBuilder object which will be passed to openSMILE log callback
-	JsonBuilder builder;
+    // JsonBuilder object which will be passed to openSMILE log callback
+    JsonBuilder builder;
 
-	
-	// Initialize and start opensmile
-	smileobj_t* handle;
-	handle = smile_new();
-	smile_initialize(
-	handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
-	smile_set_log_callback(handle, &log_callback, &builder);
+    // Initialize and start opensmile
+    smileobj_t* handle;
+    handle = smile_new();
+    smile_initialize(
+        handle, "conf/is09-13/IS13_ComParE.conf", 0, NULL, 1, 0, 0, 0);
+    smile_set_log_callback(handle, &log_callback, &builder);
 
-	// Initialize openSMILE thread
-	thread opensmile_thread(smile_run, handle);
-	
-	// Start speech streamer
-	SpeechWrapper* speech_handler = new SpeechWrapper(false, sample_rate);
-	speech_handler->start_stream();
-	process_real_cpu_clock::time_point stream_start =
-	process_real_cpu_clock::now(); // Need to know starting time to restart
-				       // stream
-	// Initialize response reader thread
-	thread asr_reader_thread(
-	process_responses, speech_handler->streamer.get(), &builder);
+    // Initialize openSMILE thread
+    thread opensmile_thread(smile_run, handle);
 
-	ofstream float_sample("float_sample", ios::out | ios::binary | ios::trunc);
-	ofstream int_sample("int_sample", ios::out | ios::binary | ios::trunc);
-	StreamingRecognizeRequest content_request;
-	vector<char> chunk(8192);
-	while (queue->pop(chunk)) {
-		// Convert char vector to float and int16 vector
-		std::vector<float> float_chunk(chunk.size() / sizeof(float));
-                std::vector<int16_t> int_chunk(chunk.size() / sizeof(int16_t));
-                if (is_float) {
-                    memcpy(&float_chunk[0], &chunk[0], chunk.size());
-                    int_chunk.clear();
-                    for (float f : float_chunk) {
-                        int_chunk.push_back((int16_t)(f * 32768));
-                    }
-                }
-                else if (is_int16) {
-                    memcpy(&int_chunk[0], &chunk[0], chunk.size());
-                    float_chunk.clear();
-                    for (int i : int_chunk) {
-                        float_chunk.push_back((float)(i / 32768.0));
-                    }
-                }
+    // Start speech streamer
+    SpeechWrapper* speech_handler = new SpeechWrapper(false, sample_rate);
+    speech_handler->start_stream();
+    process_real_cpu_clock::time_point stream_start =
+        process_real_cpu_clock::now(); // Need to know starting time to restart
+                                       // stream
+    // Initialize response reader thread
+    thread asr_reader_thread(
+        process_responses, speech_handler->streamer.get(), &builder);
 
-	    samples_done += 4096;
+    ofstream float_sample("float_sample", ios::out | ios::binary | ios::trunc);
+    ofstream int_sample("int_sample", ios::out | ios::binary | ios::trunc);
+    StreamingRecognizeRequest content_request;
+    vector<char> chunk(8192);
+    while (queue->pop(chunk)) {
+        // Convert char vector to float and int16 vector
+        std::vector<float> float_chunk(chunk.size() / sizeof(float));
+        std::vector<int16_t> int_chunk(chunk.size() / sizeof(int16_t));
+        if (is_float) {
+            memcpy(&float_chunk[0], &chunk[0], chunk.size());
+            int_chunk.clear();
+            for (float f : float_chunk) {
+                int_chunk.push_back((int16_t)(f * 32768));
+            }
+        }
+        else if (is_int16) {
+            memcpy(&int_chunk[0], &chunk[0], chunk.size());
+            float_chunk.clear();
+            for (int i : int_chunk) {
+                float_chunk.push_back((float)(i / 32768.0));
+            }
+        }
 
-	    // Write to opensmile
-	    while (true) {
-		smileres_t result = smile_extaudiosource_write_data(
-		    handle,
-		    "externalAudioSource",
-		    (void*)&float_chunk[0],
-		    chunk.size() * sizeof(float));
-		if (result == SMILE_SUCCESS) {
-		    break;
-		}
-	    }
+        samples_done += 4096;
 
-	    // Write to google asr service
-	    speech_handler->send_chunk(int_chunk);
+        // Write to opensmile
+        while (true) {
+            smileres_t result =
+                smile_extaudiosource_write_data(handle,
+                                                "externalAudioSource",
+                                                (void*)&float_chunk[0],
+                                                chunk.size() * sizeof(float));
+            if (result == SMILE_SUCCESS) {
+                break;
+            }
+        }
 
-	    // Check if asr stream needs to be restarted
-	    process_real_cpu_clock::time_point stream_current =
-		process_real_cpu_clock::now();
-	    if (stream_current - stream_start > seconds{240}) {
-		// Send writes_done and finish reading responses
-		speech_handler->send_writes_done();
-		asr_reader_thread.join();
-		// End the stream
-		speech_handler->finish_stream();
-		// Sync openSMILE time
-		double sync_time = (double)samples_done / sample_rate;
-		builder.update_sync_time(sync_time);
-		// Create new stream
-		speech_handler = new SpeechWrapper(false, sample_rate);
-		speech_handler->start_stream();
-		// Restart response reader thread
-		asr_reader_thread = thread(process_responses,
-					   speech_handler->streamer.get(),
-					   &builder);
-		stream_start = process_real_cpu_clock::now();
-	    }
-	}
+        // Write to google asr service
+        speech_handler->send_chunk(int_chunk);
 
-	float_sample.close();
-	int_sample.close();
+        // Check if asr stream needs to be restarted
+        process_real_cpu_clock::time_point stream_current =
+            process_real_cpu_clock::now();
+        if (stream_current - stream_start > seconds{240}) {
+            // Send writes_done and finish reading responses
+            speech_handler->send_writes_done();
+            asr_reader_thread.join();
+            // End the stream
+            speech_handler->finish_stream();
+            // Sync openSMILE time
+            double sync_time = (double)samples_done / sample_rate;
+            builder.update_sync_time(sync_time);
+            // Create new stream
+            speech_handler = new SpeechWrapper(false, sample_rate);
+            speech_handler->start_stream();
+            // Restart response reader thread
+            asr_reader_thread = thread(
+                process_responses, speech_handler->streamer.get(), &builder);
+            stream_start = process_real_cpu_clock::now();
+        }
+    }
 
-	speech_handler->send_writes_done();
-	asr_reader_thread.join();
-	speech_handler->finish_stream();
-	
-	smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
-	opensmile_thread.join();
+    float_sample.close();
+    int_sample.close();
+
+    speech_handler->send_writes_done();
+    asr_reader_thread.join();
+    speech_handler->finish_stream();
+
+    smile_extaudiosource_set_external_eoi(handle, "externalAudioSource");
+    opensmile_thread.join();
 }

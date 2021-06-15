@@ -1,7 +1,7 @@
-#include <thread>
-#include <mutex>
-#include "TrialListener.h"
 #include "GlobalMosquittoListener.h"
+#include "TrialListener.h"
+#include <mutex>
+#include <thread>
 
 using namespace std;
 
