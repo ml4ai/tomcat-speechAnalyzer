@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import "google/api/resource.proto";
 import "google/cloud/pubsublite/v1/common.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
 
 option csharp_namespace = "Google.Cloud.PubSubLite.V1";
 option go_package = "google.golang.org/genproto/googleapis/cloud/pubsublite/v1;pubsublite";
@@ -296,6 +297,11 @@ message CreateSubscriptionRequest {
   //
   // This value is structured like: `my-sub-name`.
   string subscription_id = 3 [(google.api.field_behavior) = REQUIRED];
+
+  // If true, the newly created subscription will only receive messages
+  // published after the subscription was created. Otherwise, the entire
+  // message backlog will be received on the subscription. Defaults to false.
+  bool skip_backlog = 4;
 }
 
 // Request for GetSubscription.

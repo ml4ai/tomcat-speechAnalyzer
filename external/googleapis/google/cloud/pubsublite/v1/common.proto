@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -96,6 +96,11 @@ message Topic {
     }
 
     // The number of partitions in the topic. Must be at least 1.
+    //
+    // Once a topic has been created the number of partitions can be increased
+    // but not decreased. Message ordering is not guaranteed across a topic
+    // resize. For more information see
+    // https://cloud.google.com/pubsub/lite/docs/topics#scaling_capacity
     int64 count = 1;
 
     // The throughput dimension of this topic.
@@ -185,4 +190,23 @@ message Subscription {
 
   // The settings for this subscription's message delivery.
   DeliveryConfig delivery_config = 3;
+}
+
+// A target publish or event time. Can be used for seeking to or retrieving the
+// corresponding cursor.
+message TimeTarget {
+  // The type of message time to query.
+  oneof time {
+    // Request the cursor of the first message with publish time greater than or
+    // equal to `publish_time`. All messages thereafter are guaranteed to have
+    // publish times >= `publish_time`.
+    google.protobuf.Timestamp publish_time = 1;
+
+    // Request the cursor of the first message with event time greater than or
+    // equal to `event_time`. If messages are missing an event time, the publish
+    // time is used as a fallback. As event times are user supplied, subsequent
+    // messages may have event times less than `event_time` and should be
+    // filtered by the client, if necessary.
+    google.protobuf.Timestamp event_time = 2;
+  }
 }

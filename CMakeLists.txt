@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_compile_definitions(BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 add_definitions(-DBOOST_LOG_DYN_LINK)
@@ -23,29 +25,6 @@ find_package(SMILEapi REQUIRED)
 find_package(Mosquitto REQUIRED)
 find_package(range-v3 REQUIRED)
 
-# ---------------------------------------------------------------------
-# Process git version information
-# ---------------------------------------------------------------------
-
-execute_process(COMMAND git rev-parse HEAD
-		OUTPUT_VARIABLE GIT_COMMIT
-		OUTPUT_STRIP_TRAILING_WHITESPACE
-		ERROR_QUIET)
-
-set(VERSION "const char* GIT_COMMIT=\"${GIT_COMMIT}\";")
-
-string(STRIP "${GIT_COMMIT}" GIT_COMMIT)
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp)
-	file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp VERSION_)
-else()
-	set(VERSION_ "")
-endif()
-
-if (NOT "${VERSION}" STREQUAL "${VERSION_}")
-    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/src/version.cpp "${VERSION}")
-endif()
-
-# ----------------------------------------------------------------------
 
 option(BUILD_GOOGLE_CLOUD_SPEECH_LIB "Build google_cloud_speech library" ON)
 
@@ -62,9 +41,13 @@ add_executable(speechAnalyzer
     src/speechAnalyzer.cpp
     src/JsonBuilder.cpp
     src/Mosquitto.cpp
+    src/TrialListener.cpp
+    src/ChunkListener.cpp
+    src/GlobalMosquittoListener.cpp
     src/SpeechWrapper.cpp
     src/util.cpp
     src/version.cpp
+    src/base64.c
 )
 
 target_link_libraries(

@@ -1,11 +1,15 @@
+#include <boost/beast/http.hpp>
+#include <boost/beast/websocket.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <thread>
-
-#include <boost/beast/http.hpp>
-#include <boost/beast/websocket.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 
 #include "JsonBuilder.h"
 #include "SpeechWrapper.h"
@@ -46,12 +50,14 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     process_real_cpu_clock::time_point stream_start;
     int samples_done = 0;
     int sample_rate = 48000;
-    bool read_start = false;
+    int samples_per_chunk = 4096;
     bool read_done = false;
     std::string participant_id;
 
     bool is_float = false;
     bool is_int16 = true;
+
+    bool is_initialized = false;
 
   public:
     // Command line arguments
@@ -63,7 +69,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     // Start the asynchronous accept operation
     template <class Body, class Allocator>
     void do_accept(http::request<Body, http::basic_fields<Allocator>> request) {
-
         using ranges::to;
         using ranges::views::split, ranges::views::drop;
 
@@ -81,7 +86,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
 
-        this->builder.participant_id = this->participant_id;
+        this->builder.participant_id = params["id"];
+
+        BOOST_LOG_TRIVIAL(info)
+            << "Accepted connection: participant_id = " << params["id"]
+            << " sample_rate = " << params["sampleRate"];
 
         // Set a decorator to change the server of the handshake
         this->ws_.set_option(
@@ -99,21 +108,50 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     }
 
   private:
-    void write_thread() {
-        // Wait for writes to start
-        while (!this->read_start) {
+    void initialize() {
+        // Initialize openSMILE
+        if (!this->args.disable_opensmile) {
+            BOOST_LOG_TRIVIAL(info) << "Initializing openSMILE system";
+            OPENSMILE_MUTEX.lock();
+            this->handle = smile_new();
+            smileopt_t* options = NULL;
+            smile_initialize(this->handle,
+                             "conf/is09-13/IS13_ComParE.conf",
+                             0,
+                             options,
+                             1,
+                             0,
+                             0,
+                             0);
+            smile_set_log_callback(
+                this->handle, &log_callback, &(this->builder));
+            this->opensmile_thread = std::thread(smile_run, this->handle);
+            OPENSMILE_MUTEX.unlock();
         }
+        // Initialize Speech Session
+        if (!this->args.disable_asr) {
+            BOOST_LOG_TRIVIAL(info) << "Initializing Google Speech  system";
+            this->speech_handler = new SpeechWrapper(false, this->sample_rate);
+            this->speech_handler->start_stream();
+            this->stream_start = process_real_cpu_clock::now();
 
-        ofstream float_sample("float_sample_" + this->participant_id,
-                              std::ios::out | std::ios::binary |
-                                  std::ios::trunc);
-        ofstream int_sample("int_sample_" + this->participant_id,
-                            std::ios::out | std::ios::binary | std::ios::trunc);
+            // Initialize asr_reader thread
+            this->asr_reader_thread =
+                std::thread(process_responses,
+                            speech_handler->streamer.get(),
+                            &(this->builder));
+        }
+        BOOST_LOG_TRIVIAL(info) << "Starting write_thread";
+        this->consumer_thread = std::thread([this] { this->write_thread(); });
+        this->is_initialized = true;
+    }
+
+    void write_thread() {
         StreamingRecognizeRequest content_request;
-        std::vector<char> chunk(16384);
+        std::vector<char> chunk(8192);
         while (!this->read_done) {
             while (spsc_queue.pop(chunk)) {
-                this->samples_done += 8096;
+                this->samples_done += 4096;
 
                 // Create f32 and i16 chunks
                 std::vector<float> float_chunk(chunk.size() / sizeof(float));
@@ -131,14 +169,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     for (int i : int_chunk) {
                         float_chunk.push_back((float)(i / 32768.0));
                     }
-                }
-
-                // Write raw audio files
-                if (!this->args.disable_audio_writing) {
-                    float_sample.write((char*)&float_chunk[0],
-                                       sizeof(float) * float_chunk.size());
-                    int_sample.write((char*)&chunk[0],
-                                     sizeof(int16_t) * chunk.size());
                 }
 
                 // Write to google asr service
@@ -184,8 +214,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
             }
         }
-        float_sample.close();
-        int_sample.close();
 
         this->speech_handler->send_writes_done();
         this->asr_reader_thread.join();
@@ -202,35 +230,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         if (ec) {
             return fail(ec, "accept");
         }
-        std::cout << "Accepted connection" << std::endl;
-        // Initialize openSMILE
-        if (!this->args.disable_opensmile) {
-            this->handle = smile_new();
-            smile_initialize(this->handle,
-                             "conf/is09-13/IS13_ComParE.conf",
-                             0,
-                             NULL,
-                             1,
-                             0,
-                             0,
-                             0);
-            smile_set_log_callback(
-                this->handle, &log_callback, &(this->builder));
-            this->opensmile_thread = std::thread(smile_run, this->handle);
-        }
-        // Initialize Speech Session
-        if (!this->args.disable_asr) {
-            this->speech_handler = new SpeechWrapper(false, this->sample_rate);
-            this->speech_handler->start_stream();
-            this->stream_start = process_real_cpu_clock::now();
-
-            // Initialize asr_reader thread
-            this->asr_reader_thread =
-                std::thread(process_responses,
-                            speech_handler->streamer.get(),
-                            &(this->builder));
-        }
-        this->consumer_thread = std::thread([this] { this->write_thread(); });
 
         // Read a message
         this->do_read();
@@ -245,6 +244,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                                           this->shared_from_this()));
         }
         else {
+            BOOST_LOG_TRIVIAL(info) << "Joining write thread";
             this->consumer_thread.join();
         }
     }
@@ -252,12 +252,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     void on_read(beast::error_code ec, size_t bytes_transferred) {
         boost::ignore_unused(bytes_transferred);
 
-        // This indicates that the WebsocketSession was closed
-        if (ec == ws::error::closed) {
-            this->read_done = true;
-        }
-
         if (ec) {
+            BOOST_LOG_TRIVIAL(info) << "Connection has been closed";
             this->read_done = true;
         }
 
@@ -269,17 +265,29 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                                  bytes_transferred);
 
         auto chunk = std::vector<char>(arr, arr + bytes_transferred);
+        delete arr;
+
+        // Push chunk to queue for write_thread
         while (!this->spsc_queue.push(chunk)) {
         }
 
-        // Set read_start
-        if (!this->read_start) {
-            this->read_start = true;
+        // Send chunk for raw audio message
+        string id = boost::uuids::to_string(boost::uuids::random_generator()());
+        if (!args.disable_chunk_publishing) {
+            this->builder.process_audio_chunk_message(chunk, id);
+        }
+        if (!args.disable_chunk_metadata_publishing) {
+            this->builder.process_audio_chunk_metadata_message(chunk, id);
         }
 
         // Clear the buffer
         this->buffer_.consume(buffer_.size());
 
+        // Initialize write_thread
+        if (!this->is_initialized) {
+            this->initialize();
+            BOOST_LOG_TRIVIAL(info) << "Begin reading chunks";
+        }
         // Do another read
         this->do_read();
     }

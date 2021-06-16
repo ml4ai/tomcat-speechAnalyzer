@@ -31,17 +31,17 @@ load(
     "moved_proto_library",
     "nodejs_gapic_assembly_pkg",
     "nodejs_gapic_library",
-    "php_gapic_assembly_pkg",
-    "php_gapic_library",
-    "php_grpc_library",
-    "php_proto_library",
+    php_gapic_assembly_pkg = "php_gapic_assembly_pkg2",
+    php_gapic_library = "php_gapic_library2",
+    php_grpc_library = "php_grpc_library2",
+    php_proto_library = "php_proto_library2",
     "proto_library_with_info",
     "py_gapic_assembly_pkg",
     "py_gapic_library",
     "py_grpc_library",
     "py_proto_library",
-    "ruby_gapic_assembly_pkg",
     "ruby_cloud_gapic_library",
+    "ruby_gapic_assembly_pkg",
     "ruby_grpc_library",
     "ruby_proto_library",
 )
@@ -212,10 +212,8 @@ php_grpc_library(
 
 php_gapic_library(
     name = "retail_php_gapic",
-    src = ":retail_proto_with_info",
-    gapic_yaml = "retail_gapic.yaml",
+    srcs = [":retail_proto_with_info"],
     grpc_service_config = "retail_grpc_service_config.json",
-    package = "google.cloud.retail.v2",
     service_yaml = "retail_v2.yaml",
     deps = [
         ":retail_php_grpc",
@@ -235,11 +233,11 @@ php_gapic_assembly_pkg(
 
 nodejs_gapic_library(
     name = "retail_nodejs_gapic",
+    package_name = "@google-cloud/retail",
     src = ":retail_proto_with_info",
     extra_protoc_parameters = ["metadata"],
     grpc_service_config = "retail_grpc_service_config.json",
     package = "google.cloud.retail.v2",
-    package_name = "@google-cloud/retail",
     service_yaml = "retail_v2.yaml",
     deps = [],
 )
@@ -265,17 +263,17 @@ ruby_grpc_library(
 
 ruby_cloud_gapic_library(
     name = "retail_ruby_gapic",
-    srcs = [":retail_proto_with_info",],
+    srcs = [":retail_proto_with_info"],
     extra_protoc_parameters = [
         "ruby-cloud-gem-name=google-cloud-retail-v2",
-        "ruby-cloud-title=Retail V2",
-        "ruby-cloud-description=Retail enables you to build an end-to-end personalized recommendation system based on state-of-the-art deep learning ML models, without a need for expertise in ML or recommendation systems.",
         "ruby-cloud-env-prefix=RETAIL",
         "ruby-cloud-product-url=https://cloud.google.com/retail/docs/apis",
         "ruby-cloud-api-id=retail.googleapis.com",
         "ruby-cloud-api-shortname=retail",
     ],
     grpc_service_config = "retail_grpc_service_config.json",
+    ruby_cloud_description = "Retail enables you to build an end-to-end personalized recommendation system based on state-of-the-art deep learning ML models, without a need for expertise in ML or recommendation systems.",
+    ruby_cloud_title = "Retail V2",
     deps = [
         ":retail_ruby_grpc",
         ":retail_ruby_proto",

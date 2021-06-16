@@ -1,16 +1,20 @@
-#include <iostream>
-#include <string>
-#include <thread>
-
-#include <boost/date_time/posix_time/posix_time.hpp>
-
 #include "JsonBuilder.h"
+#include "GlobalMosquittoListener.h"
 #include "Mosquitto.h"
 #include "arguments.h"
+#include "base64.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include "version.h"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <chrono>
+#include <iostream>
 #include <nlohmann/json.hpp>
+#include <regex>
 #include <smileapi/SMILEapi.h>
+#include <string>
+#include <thread>
 
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
@@ -29,6 +33,10 @@ JsonBuilder::JsonBuilder() {
     this->listener_client.set_max_seconds_without_messages(
         2147483647); // Max Long value
     this->listener_client_thread = thread([this] { listener_client.loop(); });
+
+    // Set the start time for the stream
+    this->stream_start_time =
+        boost::posix_time::microsec_clock::universal_time();
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -43,12 +51,10 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-            this->mosquitto_client.publish(
-                "agent/uaz/speechAnalyzer/vocalicFeatures",
-                opensmile_message.dump());
             this->opensmile_history.push_back(this->opensmile_message);
-            this->opensmile_message["header"] = create_common_header();
-            this->opensmile_message["msg"] = create_common_msg();
+            this->opensmile_message["header"] =
+                create_common_header("observation");
+            this->opensmile_message["msg"] = create_common_msg("openSMILE");
             tmeta = false;
         }
         if (tmeta) {
@@ -65,6 +71,15 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
         string field = temp.substr(dot_index + 1, equals_index - dot_index - 1);
         double value = atof(temp.substr(equals_index + 1).c_str());
 
+        // Replace '[' and ']' characters
+        size_t open = field.find("[");
+        size_t close = field.find("]");
+
+        if (open != string::npos && close != string::npos) {
+            field.replace(open, 1, "(");
+            field.replace(close, 1, ")");
+        }
+
         this->opensmile_message["data"]["features"]["lld"][field] = value;
         if (!count(
                 this->feature_list.begin(), this->feature_list.end(), field)) {
@@ -80,9 +95,10 @@ void JsonBuilder::process_message(smilelogmsg_t message) {
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
+
     nlohmann::json message;
-    message["header"] = create_common_header();
-    message["msg"] = create_common_msg();
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("asr:transcription");
 
     message["data"]["text"] = response.results(0).alternatives(0).transcript();
     message["data"]["is_final"] = response.results(0).is_final();
@@ -100,6 +116,32 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                     {"confidence", alternative.confidence()}}));
     }
     message["data"]["alternatives"] = alternatives;
+
+    // Calculate timestamps
+    if (response.results(0).is_final()) {
+        auto utt = result.alternatives(0);
+        WordInfo f = utt.words(0);
+        WordInfo l = utt.words(utt.words().size() - 1);
+
+        int64_t start_seconds = f.start_time().seconds();
+        int32_t start_nanos = f.start_time().nanos();
+        int64_t end_seconds = l.start_time().seconds();
+        int32_t end_nanos = l.start_time().nanos();
+
+        boost::posix_time::ptime start_timestamp =
+            this->stream_start_time +
+            boost::posix_time::seconds(start_seconds) +
+            boost::posix_time::nanoseconds(start_nanos);
+        boost::posix_time::ptime end_timestamp =
+            this->stream_start_time + boost::posix_time::seconds(end_seconds) +
+            boost::posix_time::nanoseconds(end_nanos);
+
+        message["data"]["start_timestamp"] =
+            boost::posix_time::to_iso_extended_string(start_timestamp) + "Z";
+        message["data"]["end_timestamp"] =
+            boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
+    }
+    // Publish message
     if (message["data"]["is_final"]) {
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
@@ -112,9 +154,10 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 // Data for handling word/feature alignment messages
 void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                             string id) {
+
     nlohmann::json message;
-    message["header"] = create_common_header();
-    message["msg"] = create_common_msg();
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("asr:alignment");
 
     auto result = response.results(0);
     for (int i = 0; i < result.alternatives_size(); i++) {
@@ -153,17 +196,53 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             message["data"]["word"] = current_word;
             message["data"]["start_time"] = start_time;
             message["data"]["end_time"] = end_time;
-            message["data"]["features"] = features_output;
-            message["data"]["git_commit"] = string(GIT_COMMIT);
-            message["data"]["id"] = id;
+            message["data"]["features"] = features_output.dump();
+            message["data"]["utterance_id"] = id;
+            message["data"]["id"] =
+                boost::uuids::to_string(boost::uuids::random_generator()());
             message["data"]["time_interval"] = 0.01;
-            this->mosquitto_client.publish("word/feature", message.dump());
+            this->mosquitto_client.publish("agent/asr/word_alignment",
+                                           message.dump());
         }
     }
 }
 
+void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id) {
+    // Encode audio chunk
+    int encoded_data_length = Base64encode_len(chunk.size());
+    char output[encoded_data_length];
+    Base64encode(output, &chunk[0], chunk.size());
+    string encoded(output);
+
+    // Create message
+    nlohmann::json message;
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("audio_chunk");
+    message["data"]["chunk"] = encoded;
+    message["data"]["id"] = id;
+    this->mosquitto_client.publish("audio/chunk", message.dump());
+}
+
+void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk,
+                                                       string id) {
+    // Check if in trial
+    if (!GLOBAL_LISTENER.in_trial) {
+        return;
+    }
+    nlohmann::json message;
+    message["header"] = create_common_header("metadata");
+    message["msg"] = create_common_msg("audio");
+    message["data"]["size"] = chunk.size();
+    message["data"]["format"] = "int16";
+    message["data"]["id"] = id;
+    message["data"]["participant_id"] = this->participant_id;
+    this->mosquitto_client.publish("agent/asr/metadata", message.dump());
+}
+
 void JsonBuilder::update_sync_time(double sync_time) {
     this->sync_time = sync_time;
+    this->stream_start_time =
+        boost::posix_time::microsec_clock::universal_time();
 }
 
 vector<nlohmann::json> JsonBuilder::features_between(double start_time,
@@ -179,7 +258,7 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
 }
 
 // Methods for creating common message types
-nlohmann::json JsonBuilder::create_common_header() {
+nlohmann::json JsonBuilder::create_common_header(string message_type) {
     nlohmann::json header;
     string timestamp =
         boost::posix_time::to_iso_extended_string(
@@ -187,13 +266,13 @@ nlohmann::json JsonBuilder::create_common_header() {
         "Z";
 
     header["timestamp"] = timestamp;
-    header["message_type"] = "observation";
+    header["message_type"] = message_type;
     header["version"] = "0.1";
 
     return header;
 }
 
-nlohmann::json JsonBuilder::create_common_msg() {
+nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     nlohmann::json message;
     string timestamp =
         boost::posix_time::to_iso_extended_string(
@@ -201,11 +280,11 @@ nlohmann::json JsonBuilder::create_common_msg() {
         "Z";
 
     message["timestamp"] = timestamp;
-    message["experiment_id"] = listener_client.experiment_id;
-    message["trial_id"] = listener_client.trial_id;
+    message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
+    message["trial_id"] = GLOBAL_LISTENER.trial_id;
     message["version"] = "0.1";
     message["source"] = "tomcat_speech_analyzer";
-    message["sub_type"] = "speech_analysis";
+    message["sub_type"] = sub_type;
 
     return message;
 }

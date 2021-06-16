@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -124,13 +124,17 @@ message ListTransitionRouteGroupsRequest {
   // The next_page_token value returned from a previous list request.
   string page_token = 3;
 
-  // The language to list transition route groups for. The field
-  // [`messages`][TransitionRoute.trigger_fulfillment.messages] in
-  // [TransitionRoute][google.cloud.dialogflow.cx.v3.TransitionRoute] is language dependent.
+  // The language to list transition route groups for. The following fields are
+  // language dependent:
+  //
+  // *  `TransitionRouteGroup.transition_routes.trigger_fulfillment.messages`
+  // *
+  // `TransitionRouteGroup.transition_routes.trigger_fulfillment.conditional_cases`
+  //
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 4;
@@ -161,13 +165,16 @@ message GetTransitionRouteGroupRequest {
     }
   ];
 
-  // The language to list transition route groups for. The field
-  // [`messages`][TransitionRoute.trigger_fulfillment.messages] in
-  // [TransitionRoute][google.cloud.dialogflow.cx.v3.TransitionRoute] is language dependent.
+  // The language to retrieve the transition route group for. The following
+  // fields are language dependent:
+  //
+  // *  `TransitionRouteGroup.transition_routes.trigger_fulfillment.messages`
+  // *
+  // `TransitionRouteGroup.transition_routes.trigger_fulfillment.conditional_cases`
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 2;
@@ -188,13 +195,15 @@ message CreateTransitionRouteGroupRequest {
   // Required. The transition route group to create.
   TransitionRouteGroup transition_route_group = 2 [(google.api.field_behavior) = REQUIRED];
 
-  // The language to list transition route groups for. The field
-  // [`messages`][TransitionRoute.trigger_fulfillment.messages] in
-  // [TransitionRoute][google.cloud.dialogflow.cx.v3.TransitionRoute] is language dependent.
+  // The language of the following fields in `TransitionRouteGroup`:
+  //
+  // *  `TransitionRouteGroup.transition_routes.trigger_fulfillment.messages`
+  // *
+  // `TransitionRouteGroup.transition_routes.trigger_fulfillment.conditional_cases`
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 3;
@@ -208,13 +217,15 @@ message UpdateTransitionRouteGroupRequest {
   // The mask to control which fields get updated.
   google.protobuf.FieldMask update_mask = 2;
 
-  // The language to list transition route groups for. The field
-  // [`messages`][TransitionRoute.trigger_fulfillment.messages] in
-  // [TransitionRoute][google.cloud.dialogflow.cx.v3.TransitionRoute] is language dependent.
+  // The language of the following fields in `TransitionRouteGroup`:
+  //
+  // *  `TransitionRouteGroup.transition_routes.trigger_fulfillment.messages`
+  // *
+  // `TransitionRouteGroup.transition_routes.trigger_fulfillment.conditional_cases`
   //
   // If not specified, the agent's default language is used.
   // [Many
-  // languages](https://cloud.google.com/dialogflow/docs/reference/language)
+  // languages](https://cloud.google.com/dialogflow/cx/docs/reference/language)
   // are supported.
   // Note: languages must be enabled in the agent before they can be used.
   string language_code = 3;
