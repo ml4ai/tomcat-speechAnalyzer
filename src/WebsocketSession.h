@@ -268,7 +268,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 		while(!this->spsc_queue.push(chunk)){
 		}		
 		// Send chunk for raw audio message
-		string id = boost::uuids::to_string(boost::uuids::random_generator()());
+		string id = "";
 		if (!args.disable_chunk_publishing) {
 		    this->builder.process_audio_chunk_message(chunk, id);
 		}
