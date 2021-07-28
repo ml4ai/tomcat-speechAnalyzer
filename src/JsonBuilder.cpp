@@ -15,7 +15,7 @@
 #include <smileapi/SMILEapi.h>
 #include <string>
 #include <thread>
-
+#include <deque>
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
 using namespace std;
@@ -47,55 +47,54 @@ JsonBuilder::~JsonBuilder() {
 }
 
 void JsonBuilder::process_message(smilelogmsg_t message) {
-    string temp(message.text);
-    temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
-    if (tmeta) {
-        if (temp.find("lld") != string::npos) {
-            this->opensmile_history.push_back(this->opensmile_message);
-            this->opensmile_message["header"] =
-                create_common_header("observation");
-            this->opensmile_message["msg"] = create_common_msg("openSMILE");
-            tmeta = false;
-        }
-        if (tmeta) {
-            auto equals_index = temp.find('=');
-            string field = temp.substr(0, equals_index);
-            double value = atof(temp.substr(equals_index + 1).c_str());
-            this->opensmile_message["data"]["tmeta"][field] = value;
-        }
-    }
+	    string temp(message.text);
+	    temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
+	    if (tmeta) {
+		if (temp.find("lld") != string::npos) {
+		    // Keep last 60 seconds of audio extractions
+		    //if(this->opensmile_history.size() >= 6000){
+		//	this->opensmile_history.pop_front();
+		  //  }
+		    this->opensmile_history.push_back(this->opensmile_message);
+		    this->opensmile_message["header"] =
+			create_common_header("observation");
+		    this->opensmile_message["msg"] = create_common_msg("openSMILE");
+		    tmeta = false;
+		}
+		if (tmeta) {
+		    auto equals_index = temp.find('=');
+		    string field = temp.substr(0, equals_index);
+		    double value = atof(temp.substr(equals_index + 1).c_str());
+		    this->opensmile_message["data"]["tmeta"][field] = value;
+		}
+	    }
 
-    if (temp.find("lld") != string::npos) {
-        auto dot_index = temp.find('.');
-        auto equals_index = temp.find('=');
-        string field = temp.substr(dot_index + 1, equals_index - dot_index - 1);
-        double value = atof(temp.substr(equals_index + 1).c_str());
+	    if (temp.find("lld") != string::npos) {
+		std::string lld = temp.substr(4);
+		auto equals_index = lld.find('=');
+		string field = lld.substr(0, equals_index);
+		double value = atof(lld.substr(equals_index+1).c_str());
 
-        // Replace '[' and ']' characters
-        size_t open = field.find("[");
-        size_t close = field.find("]");
+		// Replace '[' and ']' characters
+		size_t open = field.find("[");
+		size_t close = field.find("]");
 
-        if (open != string::npos && close != string::npos) {
-            field.replace(open, 1, "(");
-            field.replace(close, 1, ")");
-        }
+		if (open != string::npos && close != string::npos) {
+		    field.replace(open, 1, "(");
+		    field.replace(close, 1, ")");
+		}
 
-        this->opensmile_message["data"]["features"]["lld"][field] = value;
-        if (!count(
-                this->feature_list.begin(), this->feature_list.end(), field)) {
-            feature_list.push_back(field);
-        }
-    }
+		this->opensmile_message["data"]["features"]["lld"][field] = value;
+	    }
 
-    if (temp.find("tmeta:") != string::npos) {
-        tmeta = true;
-    }
+	    if (temp.find("tmeta:") != string::npos) {
+		tmeta = true;
+	    }
 }
 
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
-
     nlohmann::json message;
     message["header"] = create_common_header("observation");
     message["msg"] = create_common_msg("asr:transcription");
@@ -143,6 +142,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
+	//this->process_alignment_message(response, id);
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
     else {
@@ -154,11 +154,15 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 // Data for handling word/feature alignment messages
 void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                             string id) {
-
     nlohmann::json message;
     message["header"] = create_common_header("observation");
     message["msg"] = create_common_msg("asr:alignment");
-
+    message["data"]["text"] = response.results(0).alternatives(0).transcript();
+    message["data"]["utterance_id"] = id;
+    message["data"]["id"] =
+	boost::uuids::to_string(boost::uuids::random_generator()());
+    message["data"]["time_interval"] = 0.01;
+    vector<nlohmann::json> word_messages;
     auto result = response.results(0);
     for (int i = 0; i < result.alternatives_size(); i++) {
         auto alternative = result.alternatives(i);
@@ -193,18 +197,18 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                     }
                 }
             }
-            message["data"]["word"] = current_word;
-            message["data"]["start_time"] = start_time;
-            message["data"]["end_time"] = end_time;
-            message["data"]["features"] = features_output.dump();
-            message["data"]["utterance_id"] = id;
-            message["data"]["id"] =
-                boost::uuids::to_string(boost::uuids::random_generator()());
-            message["data"]["time_interval"] = 0.01;
-            this->mosquitto_client.publish("agent/asr/word_alignment",
-                                           message.dump());
+            nlohmann::json word_message;
+            word_message["word"] = current_word;
+            word_message["start_time"] = start_time;
+            word_message["end_time"] = end_time;
+            word_message["features"] = features_output.dump();
+	    word_messages.push_back(word_message);
         }
     }
+    message["data"]["word_messages"] = word_messages;  
+    this->mosquitto_client.publish("agent/asr/word_alignment",
+				   message.dump());
+    std::cout << message.dump() << std::endl;
 }
 
 void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id) {
@@ -249,10 +253,15 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
                                                      double end_time) {
     vector<nlohmann::json> out;
     for (int i = 0; i < opensmile_history.size(); i++) {
-        float time = opensmile_history[i]["data"]["tmeta"]["time"];
-        if (time > start_time && time < end_time) {
-            out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
-        }
+	try{
+		float time = opensmile_history[i]["data"]["tmeta"]["time"];
+		 if (time > start_time && time < end_time) {
+			out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
+		}
+	}
+	catch(nlohmann::json::type_error e){
+		std::cout << opensmile_history[i].dump() << std::endl;
+	}
     }
     return out;
 }

@@ -21,10 +21,8 @@ void fail(beast::error_code ec, char const* what) {
 
 // Callback function for openSMILE messages
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
-    OPENSMILE_MUTEX.lock();
     JsonBuilder* builder = (JsonBuilder*)(param);
     builder->process_message(message);
-    OPENSMILE_MUTEX.unlock();
 }
 
 // Process responses from an asr stream
@@ -38,6 +36,5 @@ void process_responses(
         string id = boost::uuids::to_string(boost::uuids::random_generator()());
         // Process messages
         builder->process_asr_message(response, id);
-        builder->process_alignment_message(response, id);
     }
 }

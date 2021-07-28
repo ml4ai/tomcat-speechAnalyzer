@@ -46,7 +46,6 @@ add_executable(speechAnalyzer
     src/GlobalMosquittoListener.cpp
     src/SpeechWrapper.cpp
     src/util.cpp
-    src/version.cpp
     src/base64.c
 )
 
