@@ -59,6 +59,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     bool is_int16 = true;
 
     bool is_initialized = false;
+    
+    int increment = 0;
     public:
     // Command line arguments
     static Arguments args;
@@ -268,7 +270,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 		while(!this->spsc_queue.push(chunk)){
 		}		
 		// Send chunk for raw audio message
-		string id = "";
+		string id = to_string(this->increment);
+		this->increment++;
 		if (!args.disable_chunk_publishing) {
 		    this->builder.process_audio_chunk_message(chunk, id);
 		}
