@@ -101,14 +101,14 @@ int main(int argc, char* argv[]) {
             "Disable the opensmile feature extraction system of the "
             "speechAnalyzer agent")(
             "disable_audio_writing",
-            value<bool>(&args.disable_audio_writing)->default_value(false),
+            value<bool>(&args.disable_audio_writing)->default_value(true),
             "Disable writing audio files for the speechAnalyzer agent")(
             "disable_chunk_publishing",
             value<bool>(&args.disable_chunk_publishing)->default_value(true),
             "Disable the publishing of audio chunks to the message bus")(
             "disable_chunk_metadata_publishing",
             value<bool>(&args.disable_chunk_metadata_publishing)
-                ->default_value(false),
+                ->default_value(true),
             "Disable the publishing of audio chunk  metadata to the message "
             "bus");
 
