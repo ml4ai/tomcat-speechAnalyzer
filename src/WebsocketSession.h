@@ -5,6 +5,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -12,8 +13,10 @@
 #include <thread>
 #include <filesystem>
 
+
 #include "JsonBuilder.h"
 #include "SpeechWrapper.h"
+#include "OpensmileSession.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <range/v3/all.hpp>
@@ -44,9 +47,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     std::atomic<bool> done{false};
     std::thread consumer_thread;
     std::thread asr_reader_thread;
-    std::thread opensmile_thread;
     JsonBuilder builder;
-    smileobj_t* handle;
     SpeechWrapper* speech_handler;
     process_real_cpu_clock::time_point stream_start;
     int samples_done = 0;
@@ -61,72 +62,68 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     bool is_initialized = false;
     
     int increment = 0;
+
+    // Opensmile wrapper
+    OpensmileSession *opensmile_session;
+    
     public:
     // Command line arguments
     static Arguments args;
 
+    // socket port
+    static int socket_port; 
+    
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
 
     // Start the asynchronous accept operation
     template <class Body, class Allocator>
     void do_accept(http::request<Body, http::basic_fields<Allocator>> request) {
-        using ranges::to;
-        using ranges::views::split, ranges::views::drop;
+	using ranges::to;
+	using ranges::views::split, ranges::views::drop;
 
-        std::map<std::string, std::string> params;
+	std::map<std::string, std::string> params;
 
-        auto param_strings = request.target() | drop(2) | split('&') |
-                             to<std::vector<std::string>>();
+	auto param_strings = request.target() | drop(2) | split('&') |
+			     to<std::vector<std::string>>();
 
-        for (auto param_string : param_strings) {
-            auto key_value_pair =
-                param_string | split('=') | to<std::vector<std::string>>();
-            params[key_value_pair[0]] = key_value_pair[1];
-        }
+	for (auto param_string : param_strings) {
+	    auto key_value_pair =
+		param_string | split('=') | to<std::vector<std::string>>();
+	    params[key_value_pair[0]] = key_value_pair[1];
+	}
 
-        this->participant_id = params["id"];
-        this->sample_rate = stoi(params["sampleRate"]);
+	this->participant_id = params["id"];
+	this->sample_rate = stoi(params["sampleRate"]);
 
-        this->builder.participant_id = params["id"];
+	this->builder.participant_id = params["id"];
 
 	BOOST_LOG_TRIVIAL(info)
-            << "Accepted connection: participant_id = " << params["id"]
-            << " sample_rate = " << params["sampleRate"];
+	    << "Accepted connection: participant_id = " << params["id"]
+	    << " sample_rate = " << params["sampleRate"];
 
-        // Set a decorator to change the server of the handshake
-        this->ws_.set_option(
-            ws::stream_base::decorator([](ws::response_type& res) {
-                res.set(http::field::server,
-                        std::string(BOOST_BEAST_VERSION_STRING) +
-                            " advanced-server");
-            }));
+	// Set a decorator to change the server of the handshake
+	this->ws_.set_option(
+	    ws::stream_base::decorator([](ws::response_type& res) {
+		res.set(http::field::server,
+			std::string(BOOST_BEAST_VERSION_STRING) +
+			    " advanced-server");
+	    }));
 	
-        // Accept the websocket handshake
-        this->ws_.async_accept(
-            request,
-            beast::bind_front_handler(&WebsocketSession::on_accept,
-                                      this->shared_from_this()));
+	// Accept the websocket handshake
+	this->ws_.async_accept(
+	    request,
+	    beast::bind_front_handler(&WebsocketSession::on_accept,
+				      this->shared_from_this()));
     }
 
   private:
     void initialize() {
-        // Initialize openSMILE
+        // Initialize openSMILE   
         if (!this->args.disable_opensmile) {
-            BOOST_LOG_TRIVIAL(info) << "Initializing openSMILE system";
-            this->handle = smile_new();
-            smileopt_t* options = NULL;
-            smile_initialize(this->handle,
-                             "conf/is09-13/IS13_ComParE.conf",
-                             0,
-                             options,
-                             1,
-                             0,
-                             0,
-                             0);
-            smile_set_log_callback(
-                this->handle, &log_callback, &(this->builder));
-            this->opensmile_thread = std::thread(smile_run, this->handle);
+            	BOOST_LOG_TRIVIAL(info) << "Initializing Opensmile";
+		this->socket_port++;
+		this->opensmile_session = new OpensmileSession(this->socket_port);
         }
         // Initialize Speech Session
         if (!this->args.disable_asr) {
@@ -199,18 +196,9 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                         this->stream_start = process_real_cpu_clock::now();
                     }
                 }
-                // Write to openSMILE
+                // Write to openSMILE process
                 if (!args.disable_opensmile) {
-		    while (true) {
-                        smileres_t result = smile_extaudiosource_write_data(
-                            this->handle,
-                            "externalAudioSource",
-                            (void*)&float_chunk[0],
-                            float_chunk.size() * sizeof(float));
-                        if (result == SMILE_SUCCESS) {
-                            break;
-                        }
-                    }
+			this->opensmile_session->send_chunk(float_chunk);
                 }
             }
         }
@@ -219,9 +207,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         this->speech_handler->finish_stream();
 	
         if (!this->args.disable_opensmile) {
-            smile_extaudiosource_set_external_eoi(this->handle,
-                                                  "externalAudioSource");
-            this->opensmile_thread.join();
+		this->opensmile_session->send_eoi();
         }
     }
 
