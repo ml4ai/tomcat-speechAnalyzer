@@ -3,6 +3,14 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <stdio.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+
 #include <iostream>
 
 #include "GlobalMosquittoListener.h"
@@ -21,8 +29,22 @@ void fail(beast::error_code ec, char const* what) {
 
 // Callback function for openSMILE messages
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
-    JsonBuilder* builder = (JsonBuilder*)(param);
-    builder->process_message(message);
+    	int socket = *((int*)(param));
+	int len = -1;
+
+	// Copy string for sending
+	string temp(message.text);
+	char text[temp.length()+1];
+	strcpy(text, temp.c_str());
+
+	OPENSMILE_MUTEX.lock();
+	// Send bytes 
+    	int num_bytes = sizeof(text);
+	len = send(socket, &num_bytes, 4, 0);
+	
+	// Send message
+	len = send(socket, &text, num_bytes, 0);
+	OPENSMILE_MUTEX.unlock();
 }
 
 // Process responses from an asr stream
