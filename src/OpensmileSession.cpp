@@ -12,10 +12,11 @@
 
 #include "JsonBuilder.h"
 #include "util.h"
+#include "GlobalMosquittoListener.h"
 #include <smileapi/SMILEapi.h>
 
 #include "OpensmileSession.h"
-OpensmileSession::OpensmileSession(int socket_port){
+OpensmileSession::OpensmileSession(int socket_port, JsonBuilder *builder){
 	std::cout << socket_port << std::endl;
 	if(!fork()){
 		this->mode = 1;
@@ -23,7 +24,7 @@ OpensmileSession::OpensmileSession(int socket_port){
 	}
 	else{
 		this->mode = 0;
-		this->client = new OpensmileClient(socket_port);
+		this->client = new OpensmileClient(socket_port, builder);
 	}
 	
 }
@@ -36,8 +37,10 @@ void OpensmileSession::send_eoi(){
 	this->client->send_eoi();
 }
 
-OpensmileClient::OpensmileClient(int socket_port){
+OpensmileClient::OpensmileClient(int socket_port, JsonBuilder *builder){
 	this->socket_port = socket_port;
+	this->builder = builder;
+
 	// Start socket client
 	if((this->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0){
 		std::cout << "socket_error" << std::endl;
@@ -52,7 +55,11 @@ OpensmileClient::OpensmileClient(int socket_port){
 	
 	while(connect(this->sock, (struct sockaddr *)&this->serv_addr, sizeof(this->serv_addr)) < 0){
 		//std::cout << "connection error" << std::endl;
-	}	
+	}
+
+	// Start listening thread for opensmile output
+	this->looping = true;
+	this->loop_thread = thread([this] {this->loop(); });	
 }
 
 void OpensmileClient::send_chunk(vector<float> float_chunk){
@@ -60,26 +67,32 @@ void OpensmileClient::send_chunk(vector<float> float_chunk){
 }
 
 void OpensmileClient::send_eoi(){
+	this->looping = false;
+	this->loop_thread.join();
+
 	close(this->sock);
+}
+
+void OpensmileClient::loop(){
+	int num_bytes = -1;
+	int len = -1;
+	while(this->looping){
+		// Recv num bytes
+		len = recv(this->sock, &num_bytes, sizeof(int), 0);
+		if(num_bytes > 1000 || len != 4){
+			std::cout << num_bytes  <<  " FEAGAGGEAGEGAEA"  << std::endl;
+			continue;
+		}	
+		// Recv string 
+		char c[num_bytes];
+		recv(this->sock, &c, num_bytes, 0);
+		string message(c);
+		this->builder->process_message(message);
+	}	
 }
 
 OpensmileServer::OpensmileServer(int socket_port){
 	this->socket_port = socket_port;
-
-	// Initialize Opensmile
-	this->handle = smile_new();
-	smileopt_t* options = NULL;
-	smile_initialize(this->handle,
-		     "conf/is09-13/IS13_ComParE.conf",
-		     0,
-		     options,
-		     1,
-		     0,
-		     1, // Console Output
-		     0);
-	smile_set_log_callback(this->handle, &log_callback, &(this->builder));
-	this->opensmile_thread = std::thread(smile_run, this->handle);
-
 
 	// Start socket server
 	if((this->server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0){
@@ -106,11 +119,24 @@ OpensmileServer::OpensmileServer(int socket_port){
                 std::cout << "accept" << std::endl;
            }	
 	
+	// Initialize Opensmile
+	this->handle = smile_new();
+	smileopt_t* options = NULL;
+	smile_initialize(this->handle,
+		     "conf/is09-13/IS13_ComParE.conf",
+		     0,
+		     options,
+		     1,
+		     0, // Debug
+		     0, // Console Output
+		     0);
+	smile_set_log_callback(this->handle, &log_callback, &(this->new_socket));
+	this->opensmile_thread = std::thread(smile_run, this->handle);
+	
 	float float_chunk[4096];	
 	while(true){
 		// Read chunk from socket
 		int len = recv(this->new_socket, &float_chunk, sizeof(float)*4096,  0);
-
 		if(len == 0){
 			break;
 		}
@@ -123,7 +149,9 @@ OpensmileServer::OpensmileServer(int socket_port){
 			}
 		}
 	}
+	
 	close(this->new_socket);
 	smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
 	exit(0);
 }
+

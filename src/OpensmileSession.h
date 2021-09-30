@@ -10,16 +10,23 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 
+#include <mutex>
+
 #include "JsonBuilder.h"
 #include <smileapi/SMILEapi.h>
 
 class OpensmileClient{
 	public:
-		OpensmileClient(int socket_port);
+		OpensmileClient(int socket_port, JsonBuilder *builder);
 		void send_chunk(std::vector<float> float_chunk);
 		void send_eoi();
+		void loop();
 	private:
+		JsonBuilder *builder;
 		
+		bool looping;
+		std::thread loop_thread;
+
 		int sock=0, valread;
 		struct sockaddr_in serv_addr;
 		int socket_port;
@@ -28,12 +35,10 @@ class OpensmileClient{
 class OpensmileServer{
 	public:
 		OpensmileServer(int socket_port);
+
 	private:
-
-
 		smileobj_t* handle;
 		std::thread opensmile_thread;
-		JsonBuilder builder;
 
 		int server_fd, new_socket, valread;
 		struct sockaddr_in address;
@@ -44,7 +49,7 @@ class OpensmileServer{
 
 class OpensmileSession{
 	public:
-		OpensmileSession(int socket_port);
+		OpensmileSession(int socket_port, JsonBuilder *builder);
 
 		void send_chunk(std::vector<float> float_chunk);
 		void send_eoi();
@@ -53,4 +58,5 @@ class OpensmileSession{
 		OpensmileClient *client;
 		OpensmileServer *server;	
 };
+
 
