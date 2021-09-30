@@ -22,7 +22,7 @@ class JsonBuilder {
     ~JsonBuilder();
 
     // Process an openSMILE log messag
-    void process_message(smilelogmsg_t message);
+    void process_message(std::string message);
 
     // Process an asr message
     void process_asr_message(
@@ -33,6 +33,7 @@ class JsonBuilder {
     void process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
+    void process_mcc_message(std::string message);
 
     // Process a audio chunk message
     void process_audio_chunk_message(std::vector<char> chunk, std::string id);

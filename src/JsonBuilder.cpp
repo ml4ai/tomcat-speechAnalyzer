@@ -3,11 +3,20 @@
 #include "Mosquitto.h"
 #include "arguments.h"
 #include "base64.h"
+
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
+#include <boost/asio/connect.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <cstdlib>
+
 #include <chrono>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -16,6 +25,12 @@
 #include <string>
 #include <thread>
 #include <deque>
+
+namespace beast = boost::beast;     // from <boost/beast.hpp>
+namespace http = beast::http;       // from <boost/beast/http.hpp>
+namespace net = boost::asio;        // from <boost/asio.hpp>
+using tcp = net::ip::tcp;           // from <boost/asio/ip/tcp.hpp>
+
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
 using namespace std;
@@ -46,16 +61,13 @@ JsonBuilder::~JsonBuilder() {
     this->listener_client_thread.join();
 }
 
-void JsonBuilder::process_message(smilelogmsg_t message) {
-	    string temp(message.text);
+void JsonBuilder::process_message(string message) {
+	    string temp(message);
 	    temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
 	    if (tmeta) {
 		if (temp.find("lld") != string::npos) {
-		    // Keep last 60 seconds of audio extractions
-		    //if(this->opensmile_history.size() >= 6000){
-		//	this->opensmile_history.pop_front();
-		  //  }
 		    this->opensmile_history.push_back(this->opensmile_message);
+		    //std::cout << opensmile_history.size() << std::endl;
 		    this->opensmile_message["header"] =
 			create_common_header("observation");
 		    this->opensmile_message["msg"] = create_common_msg("openSMILE");
@@ -142,7 +154,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
-	//this->process_alignment_message(response, id);
+	this->process_alignment_message(response, id);
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
     else {
@@ -180,6 +192,7 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             // Get extracted features message history
             vector<nlohmann::json> history =
                 this->features_between(start_time, end_time);
+	    //this->opensmile_history.clear();
             // Initialize the features output by creating a vector for each
             // feature
             nlohmann::json features_output;
@@ -208,7 +221,67 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
     message["data"]["word_messages"] = word_messages;  
     this->mosquitto_client.publish("agent/asr/word_alignment",
 				   message.dump());
-    std::cout << message.dump() << std::endl;
+
+    // Process mcc_message
+    //this->process_mcc_message(message.dump());
+}
+
+void JsonBuilder::process_mcc_message(string message){
+	try{
+		auto const host = "localhost";
+		auto const port = "8001";
+		auto const target = "/encode";
+		int version = 11;
+
+		net::io_context ioc;
+
+		// These objects perform our I/O
+		tcp::resolver resolver(ioc);
+		beast::tcp_stream stream(ioc);
+
+		// Look up the domain name
+		auto const results = resolver.resolve(host, port);
+
+		// Make the connection on the IP address we get from a lookup
+		stream.connect(results);
+
+		// Set up an HTTP GET request message
+		http::request<http::string_body> req{http::verb::get, target, version};
+		req.set(http::field::host, host);
+		req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+		req.body() = message;
+		req.prepare_payload();
+
+		// Send the HTTP request to the remote host
+		http::write(stream, req);
+
+		// This buffer is used for reading and must be persisted
+		beast::flat_buffer buffer;
+
+		// Declare a container to hold the response
+		http::response<http::string_body> res;
+
+		// Receive the HTTP response
+		http::read(stream, buffer, res);
+
+		this->mosquitto_client.publish("agent/asr/mcc", res.body().data());
+		
+		// Write the message to standard out
+		//std::cout << res << std::endl;
+
+		// Gracefully close the socket
+		beast::error_code ec;
+		stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+
+		// not_connected happens sometimes
+		// so don't bother reporting it.
+		//
+		if(ec && ec != beast::errc::not_connected)
+		    throw beast::system_error{ec};
+	}
+	catch(std::exception const& e){
+		std::cerr << e.what() << std::endl;
+	}
 }
 
 void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id) {
@@ -253,14 +326,9 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
                                                      double end_time) {
     vector<nlohmann::json> out;
     for (int i = 0; i < opensmile_history.size(); i++) {
-	try{
-		float time = opensmile_history[i]["data"]["tmeta"]["time"];
-		 if (time > start_time && time < end_time) {
-			out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
-		}
-	}
-	catch(nlohmann::json::type_error e){
-		std::cout << opensmile_history[i].dump() << std::endl;
+	float time = opensmile_history[i]["data"]["tmeta"]["time"];
+	if (time > start_time && time < end_time) {
+		out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
 	}
     }
     return out;
