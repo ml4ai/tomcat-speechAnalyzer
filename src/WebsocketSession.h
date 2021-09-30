@@ -123,7 +123,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         if (!this->args.disable_opensmile) {
             	BOOST_LOG_TRIVIAL(info) << "Initializing Opensmile";
 		this->socket_port++;
-		this->opensmile_session = new OpensmileSession(this->socket_port);
+		this->opensmile_session = new OpensmileSession(this->socket_port, &this->builder);
         }
         // Initialize Speech Session
         if (!this->args.disable_asr) {
