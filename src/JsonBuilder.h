@@ -30,10 +30,10 @@ class JsonBuilder {
         std::string id);
 
     // Process a word/feature alignment message
-    void process_alignment_message(
+    std::string process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
-    void process_mcc_message(std::string message);
+    std::string process_mmc_message(std::string message);
 
     // Process a audio chunk message
     void process_audio_chunk_message(std::vector<char> chunk, std::string id);

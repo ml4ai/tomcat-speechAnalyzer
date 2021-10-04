@@ -154,8 +154,12 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
-	this->process_alignment_message(response, id);
-        this->mosquitto_client.publish("agent/asr/final", message.dump());
+	string features = this->process_alignment_message(response, id);
+	string mmc = this->process_mmc_message(features);
+        message["data"]["features"] = features;
+	message["data"]["mmc"] = mmc;
+	
+	this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
     else {
         this->mosquitto_client.publish("agent/asr/intermediate",
@@ -164,7 +168,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 }
 
 // Data for handling word/feature alignment messages
-void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
+string JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                             string id) {
     nlohmann::json message;
     message["header"] = create_common_header("observation");
@@ -219,18 +223,19 @@ void JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
         }
     }
     message["data"]["word_messages"] = word_messages;  
-    this->mosquitto_client.publish("agent/asr/word_alignment",
-				   message.dump());
+    return message.dump(); 
+   //this->mosquitto_client.publish("agent/asr/word_alignment",
+   //			   message.dump());
 
     // Process mcc_message
     //this->process_mcc_message(message.dump());
 }
 
-void JsonBuilder::process_mcc_message(string message){
+string JsonBuilder::process_mmc_message(string message){
 	try{
-		auto const host = "localhost";
-		auto const port = "8001";
-		auto const target = "/encode";
+		string host = "mmc";
+		string port = "8001";
+		string target = "/encode";
 		int version = 11;
 
 		net::io_context ioc;
@@ -264,10 +269,10 @@ void JsonBuilder::process_mcc_message(string message){
 		// Receive the HTTP response
 		http::read(stream, buffer, res);
 
-		this->mosquitto_client.publish("agent/asr/mcc", res.body().data());
+		//this->mosquitto_client.publish("agent/asr/mcc", res.body().data());
 		
 		// Write the message to standard out
-		//std::cout << res << std::endl;
+		std::cout << res << std::endl;
 
 		// Gracefully close the socket
 		beast::error_code ec;
@@ -278,10 +283,13 @@ void JsonBuilder::process_mcc_message(string message){
 		//
 		if(ec && ec != beast::errc::not_connected)
 		    throw beast::system_error{ec};
+	
+		return res.body().data();
 	}
 	catch(std::exception const& e){
 		std::cerr << e.what() << std::endl;
 	}
+	return "";
 }
 
 void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id) {
