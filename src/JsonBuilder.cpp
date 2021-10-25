@@ -156,8 +156,8 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     if (message["data"]["is_final"]) {
 	string features = this->process_alignment_message(response, id);
 	string mmc = this->process_mmc_message(features);
-        message["data"]["features"] = features;
-	message["data"]["mmc"] = mmc;
+        message["data"]["features"] = nlohmann::json::parse(features);
+	message["data"]["sentiment"] = nlohmann::json::parse(mmc);
 	
 	this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
@@ -196,7 +196,6 @@ string JsonBuilder::process_alignment_message(StreamingRecognizeResponse respons
             // Get extracted features message history
             vector<nlohmann::json> history =
                 this->features_between(start_time, end_time);
-	    //this->opensmile_history.clear();
             // Initialize the features output by creating a vector for each
             // feature
             nlohmann::json features_output;
@@ -223,12 +222,7 @@ string JsonBuilder::process_alignment_message(StreamingRecognizeResponse respons
         }
     }
     message["data"]["word_messages"] = word_messages;  
-    return message.dump(); 
-   //this->mosquitto_client.publish("agent/asr/word_alignment",
-   //			   message.dump());
-
-    // Process mcc_message
-    //this->process_mcc_message(message.dump());
+    return message.dump();
 }
 
 string JsonBuilder::process_mmc_message(string message){
@@ -272,7 +266,6 @@ string JsonBuilder::process_mmc_message(string message){
 		//this->mosquitto_client.publish("agent/asr/mcc", res.body().data());
 		
 		// Write the message to standard out
-		std::cout << res << std::endl;
 
 		// Gracefully close the socket
 		beast::error_code ec;
