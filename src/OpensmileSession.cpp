@@ -80,7 +80,6 @@ void OpensmileClient::loop(){
 		// Recv num bytes
 		len = recv(this->sock, &num_bytes, sizeof(int), 0);
 		if(num_bytes > 1000 || len != 4){
-			std::cout << num_bytes  <<  " FEAGAGGEAGEGAEA"  << std::endl;
 			continue;
 		}	
 		// Recv string 
