@@ -1,14 +1,14 @@
 #pragma once
-#include <string>
-#include <thread>
-#include <vector>
-#include <deque>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include "Mosquitto.h"
 #include "TrialListener.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <deque>
 #include <nlohmann/json.hpp>
 #include <smileapi/SMILEapi.h>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include "arguments.h"
 class JsonBuilder {
@@ -42,6 +42,7 @@ class JsonBuilder {
 
     // Update the sync time for word/feature alignment messages
     void update_sync_time(double sync_time);
+
   private:
     // Time object for start of stream
     boost::posix_time::ptime stream_start_time;
@@ -60,7 +61,6 @@ class JsonBuilder {
     std::vector<nlohmann::json> features_between(double start_time,
                                                  double end_time);
 
-     
     // Functions for creating cmomon message types
     nlohmann::json create_common_header(std::string message_type);
     nlohmann::json create_common_msg(std::string sub_type);

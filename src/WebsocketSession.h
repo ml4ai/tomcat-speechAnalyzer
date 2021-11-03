@@ -7,16 +7,15 @@
 #include <boost/uuid/uuid_io.hpp>
 
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <thread>
-#include <filesystem>
-
 
 #include "JsonBuilder.h"
-#include "SpeechWrapper.h"
 #include "OpensmileSession.h"
+#include "SpeechWrapper.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <range/v3/all.hpp>
@@ -60,70 +59,71 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     bool is_int16 = true;
 
     bool is_initialized = false;
-    
+
     int increment = 0;
 
     // Opensmile wrapper
-    OpensmileSession *opensmile_session;
-    
-    public:
+    OpensmileSession* opensmile_session;
+
+  public:
     // Command line arguments
     static Arguments args;
 
     // socket port
-    static int socket_port; 
-    
+    static int socket_port;
+
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
 
     // Start the asynchronous accept operation
     template <class Body, class Allocator>
     void do_accept(http::request<Body, http::basic_fields<Allocator>> request) {
-	using ranges::to;
-	using ranges::views::split, ranges::views::drop;
+        using ranges::to;
+        using ranges::views::split, ranges::views::drop;
 
-	std::map<std::string, std::string> params;
+        std::map<std::string, std::string> params;
 
-	auto param_strings = request.target() | drop(2) | split('&') |
-			     to<std::vector<std::string>>();
+        auto param_strings = request.target() | drop(2) | split('&') |
+                             to<std::vector<std::string>>();
 
-	for (auto param_string : param_strings) {
-	    auto key_value_pair =
-		param_string | split('=') | to<std::vector<std::string>>();
-	    params[key_value_pair[0]] = key_value_pair[1];
-	}
+        for (auto param_string : param_strings) {
+            auto key_value_pair =
+                param_string | split('=') | to<std::vector<std::string>>();
+            params[key_value_pair[0]] = key_value_pair[1];
+        }
 
-	this->participant_id = params["id"];
-	this->sample_rate = stoi(params["sampleRate"]);
+        this->participant_id = params["id"];
+        this->sample_rate = stoi(params["sampleRate"]);
 
-	this->builder.participant_id = params["id"];
+        this->builder.participant_id = params["id"];
 
-	BOOST_LOG_TRIVIAL(info)
-	    << "Accepted connection: participant_id = " << params["id"]
-	    << " sample_rate = " << params["sampleRate"];
+        BOOST_LOG_TRIVIAL(info)
+            << "Accepted connection: participant_id = " << params["id"]
+            << " sample_rate = " << params["sampleRate"];
 
-	// Set a decorator to change the server of the handshake
-	this->ws_.set_option(
-	    ws::stream_base::decorator([](ws::response_type& res) {
-		res.set(http::field::server,
-			std::string(BOOST_BEAST_VERSION_STRING) +
-			    " advanced-server");
-	    }));
-	
-	// Accept the websocket handshake
-	this->ws_.async_accept(
-	    request,
-	    beast::bind_front_handler(&WebsocketSession::on_accept,
-				      this->shared_from_this()));
+        // Set a decorator to change the server of the handshake
+        this->ws_.set_option(
+            ws::stream_base::decorator([](ws::response_type& res) {
+                res.set(http::field::server,
+                        std::string(BOOST_BEAST_VERSION_STRING) +
+                            " advanced-server");
+            }));
+
+        // Accept the websocket handshake
+        this->ws_.async_accept(
+            request,
+            beast::bind_front_handler(&WebsocketSession::on_accept,
+                                      this->shared_from_this()));
     }
 
   private:
     void initialize() {
-        // Initialize openSMILE   
+        // Initialize openSMILE
         if (!this->args.disable_opensmile) {
-            	BOOST_LOG_TRIVIAL(info) << "Initializing Opensmile";
-		this->socket_port++;
-		this->opensmile_session = new OpensmileSession(this->socket_port, &this->builder);
+            BOOST_LOG_TRIVIAL(info) << "Initializing Opensmile";
+            this->socket_port++;
+            this->opensmile_session =
+                new OpensmileSession(this->socket_port, &this->builder);
         }
         // Initialize Speech Session
         if (!this->args.disable_asr) {
@@ -174,7 +174,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     process_real_cpu_clock::time_point stream_current =
                         process_real_cpu_clock::now();
                     if (stream_current - this->stream_start > minutes{4}) {
-            		BOOST_LOG_TRIVIAL(info) << "Restarting google speech stream";
+                        BOOST_LOG_TRIVIAL(info)
+                            << "Restarting google speech stream";
                         // Send writes_done and finish reading responses
                         this->speech_handler->send_writes_done();
                         this->asr_reader_thread.join();
@@ -198,16 +199,16 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
                 // Write to openSMILE process
                 if (!args.disable_opensmile) {
-			this->opensmile_session->send_chunk(float_chunk);
+                    this->opensmile_session->send_chunk(float_chunk);
                 }
             }
         }
         this->speech_handler->send_writes_done();
         this->asr_reader_thread.join();
         this->speech_handler->finish_stream();
-	
+
         if (!this->args.disable_opensmile) {
-		this->opensmile_session->send_eoi();
+            this->opensmile_session->send_eoi();
         }
     }
 
@@ -241,40 +242,41 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             this->read_done = true;
         }
 
-	if(bytes_transferred != 0){	
-		// Echo the message
-		this->ws_.text(this->ws_.got_text());
-		char* arr = new char[bytes_transferred];
-		boost::asio::buffer_copy(boost::asio::buffer(arr, bytes_transferred),
-					 this->buffer_.data(),
-					 bytes_transferred);
+        if (bytes_transferred != 0) {
+            // Echo the message
+            this->ws_.text(this->ws_.got_text());
+            char* arr = new char[bytes_transferred];
+            boost::asio::buffer_copy(
+                boost::asio::buffer(arr, bytes_transferred),
+                this->buffer_.data(),
+                bytes_transferred);
 
-		auto chunk = std::vector<char>(arr, arr + bytes_transferred);
-		delete[] arr;
+            auto chunk = std::vector<char>(arr, arr + bytes_transferred);
+            delete[] arr;
 
-		// Push the chunk to the queue for the write_thread
-		while(!this->spsc_queue.push(chunk)){
-		}		
-		// Send chunk for raw audio message
-		string id = to_string(this->increment);
-		this->increment++;
-		if (!args.disable_chunk_publishing) {
-		    this->builder.process_audio_chunk_message(chunk, id);
-		}
-		if (!args.disable_chunk_metadata_publishing) {
-		    this->builder.process_audio_chunk_metadata_message(chunk, id);
-		}
+            // Push the chunk to the queue for the write_thread
+            while (!this->spsc_queue.push(chunk)) {
+            }
+            // Send chunk for raw audio message
+            string id = to_string(this->increment);
+            this->increment++;
+            if (!args.disable_chunk_publishing) {
+                this->builder.process_audio_chunk_message(chunk, id);
+            }
+            if (!args.disable_chunk_metadata_publishing) {
+                this->builder.process_audio_chunk_metadata_message(chunk, id);
+            }
 
-		// Clear the buffer
-		this->buffer_.consume(buffer_.size());
+            // Clear the buffer
+            this->buffer_.consume(buffer_.size());
 
-		// Initialize write_thread
-		if (!this->is_initialized) {
-		    this->initialize();
-		    BOOST_LOG_TRIVIAL(info) << "Begin reading chunks";
-		}
-	}
-	// Do another read
-	this->do_read();
+            // Initialize write_thread
+            if (!this->is_initialized) {
+                this->initialize();
+                BOOST_LOG_TRIVIAL(info) << "Begin reading chunks";
+            }
+        }
+        // Do another read
+        this->do_read();
     }
 };

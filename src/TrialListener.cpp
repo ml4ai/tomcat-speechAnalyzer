@@ -15,7 +15,7 @@ void TrialListener::on_message(const string& topic, const string& message) {
     if (m["msg"].contains("experiment_id")) {
         this->experiment_id = m["msg"]["experiment_id"];
     }
-    
+
     // Check if trial has started
     std::string sub_type = m["msg"]["sub_type"];
     if (sub_type.compare("start") == 0) {

@@ -10,26 +10,26 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <boost/asio/connect.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
-#include <boost/asio/connect.hpp>
-#include <boost/asio/ip/tcp.hpp>
 #include <cstdlib>
 
 #include <chrono>
+#include <deque>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <smileapi/SMILEapi.h>
 #include <string>
 #include <thread>
-#include <deque>
 
-namespace beast = boost::beast;     // from <boost/beast.hpp>
-namespace http = beast::http;       // from <boost/beast/http.hpp>
-namespace net = boost::asio;        // from <boost/asio.hpp>
-using tcp = net::ip::tcp;           // from <boost/asio/ip/tcp.hpp>
+namespace beast = boost::beast; // from <boost/beast.hpp>
+namespace http = beast::http;   // from <boost/beast/http.hpp>
+namespace net = boost::asio;    // from <boost/asio.hpp>
+using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
@@ -62,45 +62,45 @@ JsonBuilder::~JsonBuilder() {
 }
 
 void JsonBuilder::process_message(string message) {
-	    string temp(message);
-	    temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
-	    if (tmeta) {
-		if (temp.find("lld") != string::npos) {
-		    this->opensmile_history.push_back(this->opensmile_message);
-		    this->opensmile_message["header"] =
-			create_common_header("observation");
-		    this->opensmile_message["msg"] = create_common_msg("openSMILE");
-		    tmeta = false;
-		}
-		if (tmeta) {
-		    auto equals_index = temp.find('=');
-		    string field = temp.substr(0, equals_index);
-		    double value = atof(temp.substr(equals_index + 1).c_str());
-		    this->opensmile_message["data"]["tmeta"][field] = value;
-		}
-	    }
+    string temp(message);
+    temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
+    if (tmeta) {
+        if (temp.find("lld") != string::npos) {
+            this->opensmile_history.push_back(this->opensmile_message);
+            this->opensmile_message["header"] =
+                create_common_header("observation");
+            this->opensmile_message["msg"] = create_common_msg("openSMILE");
+            tmeta = false;
+        }
+        if (tmeta) {
+            auto equals_index = temp.find('=');
+            string field = temp.substr(0, equals_index);
+            double value = atof(temp.substr(equals_index + 1).c_str());
+            this->opensmile_message["data"]["tmeta"][field] = value;
+        }
+    }
 
-	    if (temp.find("lld") != string::npos) {
-		std::string lld = temp.substr(4);
-		auto equals_index = lld.find('=');
-		string field = lld.substr(0, equals_index);
-		double value = atof(lld.substr(equals_index+1).c_str());
+    if (temp.find("lld") != string::npos) {
+        std::string lld = temp.substr(4);
+        auto equals_index = lld.find('=');
+        string field = lld.substr(0, equals_index);
+        double value = atof(lld.substr(equals_index + 1).c_str());
 
-		// Replace '[' and ']' characters
-		size_t open = field.find("[");
-		size_t close = field.find("]");
+        // Replace '[' and ']' characters
+        size_t open = field.find("[");
+        size_t close = field.find("]");
 
-		if (open != string::npos && close != string::npos) {
-		    field.replace(open, 1, "(");
-		    field.replace(close, 1, ")");
-		}
+        if (open != string::npos && close != string::npos) {
+            field.replace(open, 1, "(");
+            field.replace(close, 1, ")");
+        }
 
-		this->opensmile_message["data"]["features"]["lld"][field] = value;
-	    }
+        this->opensmile_message["data"]["features"]["lld"][field] = value;
+    }
 
-	    if (temp.find("tmeta:") != string::npos) {
-		tmeta = true;
-	    }
+    if (temp.find("tmeta:") != string::npos) {
+        tmeta = true;
+    }
 }
 
 // Data for handling google asr messages
@@ -153,12 +153,12 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
-	string features = this->process_alignment_message(response, id);
-	string mmc = this->process_mmc_message(features);
+        string features = this->process_alignment_message(response, id);
+        string mmc = this->process_mmc_message(features);
         message["data"]["features"] = nlohmann::json::parse(features);
-	message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-	
-	this->mosquitto_client.publish("agent/asr/final", message.dump());
+        message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+
+        this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
     else {
         this->mosquitto_client.publish("agent/asr/intermediate",
@@ -167,15 +167,16 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 }
 
 // Data for handling word/feature alignment messages
-string JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
-                                            string id) {
+string
+JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
+                                       string id) {
     nlohmann::json message;
     message["header"] = create_common_header("observation");
     message["msg"] = create_common_msg("asr:alignment");
     message["data"]["text"] = response.results(0).alternatives(0).transcript();
     message["data"]["utterance_id"] = id;
     message["data"]["id"] =
-	boost::uuids::to_string(boost::uuids::random_generator()());
+        boost::uuids::to_string(boost::uuids::random_generator()());
     message["data"]["time_interval"] = 0.01;
     vector<nlohmann::json> word_messages;
     auto result = response.results(0);
@@ -217,69 +218,69 @@ string JsonBuilder::process_alignment_message(StreamingRecognizeResponse respons
             word_message["start_time"] = start_time;
             word_message["end_time"] = end_time;
             word_message["features"] = features_output.dump();
-	    word_messages.push_back(word_message);
+            word_messages.push_back(word_message);
         }
     }
-    message["data"]["word_messages"] = word_messages;  
+    message["data"]["word_messages"] = word_messages;
     return message.dump();
 }
 
-string JsonBuilder::process_mmc_message(string message){
-	try{
-		string host = "mmc";
-		string port = "8001";
-		string target = "/encode";
-		int version = 11;
+string JsonBuilder::process_mmc_message(string message) {
+    try {
+        string host = "mmc";
+        string port = "8001";
+        string target = "/encode";
+        int version = 11;
 
-		net::io_context ioc;
+        net::io_context ioc;
 
-		// These objects perform our I/O
-		tcp::resolver resolver(ioc);
-		beast::tcp_stream stream(ioc);
+        // These objects perform our I/O
+        tcp::resolver resolver(ioc);
+        beast::tcp_stream stream(ioc);
 
-		// Look up the domain name
-		auto const results = resolver.resolve(host, port);
+        // Look up the domain name
+        auto const results = resolver.resolve(host, port);
 
-		// Make the connection on the IP address we get from a lookup
-		stream.connect(results);
+        // Make the connection on the IP address we get from a lookup
+        stream.connect(results);
 
-		// Set up an HTTP GET request message
-		http::request<http::string_body> req{http::verb::get, target, version};
-		req.set(http::field::host, host);
-		req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-		req.body() = message;
-		req.prepare_payload();
+        // Set up an HTTP GET request message
+        http::request<http::string_body> req{http::verb::get, target, version};
+        req.set(http::field::host, host);
+        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.body() = message;
+        req.prepare_payload();
 
-		// Send the HTTP request to the remote host
-		http::write(stream, req);
+        // Send the HTTP request to the remote host
+        http::write(stream, req);
 
-		// This buffer is used for reading and must be persisted
-		beast::flat_buffer buffer;
+        // This buffer is used for reading and must be persisted
+        beast::flat_buffer buffer;
 
-		// Declare a container to hold the response
-		http::response<http::string_body> res;
+        // Declare a container to hold the response
+        http::response<http::string_body> res;
 
-		// Receive the HTTP response
-		http::read(stream, buffer, res);
+        // Receive the HTTP response
+        http::read(stream, buffer, res);
 
-		// Write the message to standard out
+        // Write the message to standard out
 
-		// Gracefully close the socket
-		beast::error_code ec;
-		stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+        // Gracefully close the socket
+        beast::error_code ec;
+        stream.socket().shutdown(tcp::socket::shutdown_both, ec);
 
-		// not_connected happens sometimes
-		// so don't bother reporting it.
-		//
-		if(ec && ec != beast::errc::not_connected)
-		    throw beast::system_error{ec};
-	
-		return res.body().data();
-	}
-	catch(std::exception const& e){
-		std::cerr << e.what() << std::endl;
-	}
-	return "";
+        // not_connected happens sometimes
+        // so don't bother reporting it.
+        //
+        if (ec && ec != beast::errc::not_connected)
+            throw beast::system_error{ec};
+
+        return res.body().data();
+    }
+    catch (std::exception const& e) {
+        std::cerr << e.what() << std::endl;
+    }
+    return "";
 }
 
 void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id) {
@@ -324,10 +325,10 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
                                                      double end_time) {
     vector<nlohmann::json> out;
     for (int i = 0; i < opensmile_history.size(); i++) {
-	float time = opensmile_history[i]["data"]["tmeta"]["time"];
-	if (time > start_time && time < end_time) {
-		out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
-	}
+        float time = opensmile_history[i]["data"]["tmeta"]["time"];
+        if (time > start_time && time < end_time) {
+            out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
+        }
     }
     return out;
 }

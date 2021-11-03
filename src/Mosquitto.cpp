@@ -236,17 +236,18 @@ void Mosquitto::set_max_seconds_without_messages(
 }
 
 void MosquittoListener::on_message(const string& topic, const string& message) {
-    try{
-	    nlohmann::json m = nlohmann::json::parse(message);
-	    if (m["msg"].contains("trial_id")) {
-		this->trial_id = m["msg"]["trial_id"];
-	    }
-	    if (m["msg"].contains("experiment_id")) {
-		this->experiment_id = m["msg"]["experiment_id"];
-	    }
+    try {
+        nlohmann::json m = nlohmann::json::parse(message);
+        if (m["msg"].contains("trial_id")) {
+            this->trial_id = m["msg"]["trial_id"];
+        }
+        if (m["msg"].contains("experiment_id")) {
+            this->experiment_id = m["msg"]["experiment_id"];
+        }
     }
-    catch(nlohmann::json::exception e){
-	BOOST_LOG_TRIVIAL(info) << "An error occured parsing the following message: \n" << "Topic: " << topic << "\nMessage: "<<  message;
+    catch (nlohmann::json::exception e) {
+        BOOST_LOG_TRIVIAL(info)
+            << "An error occured parsing the following message: \n"
+            << "Topic: " << topic << "\nMessage: " << message;
     }
-	
 }
