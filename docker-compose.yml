@@ -25,3 +25,14 @@ services:
         aliases:
           - mmc
     entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
+
+  heartbeat:
+    image: heartbeat:latest
+    container_name: heartbeat
+    volumes:
+      - ./config.json:/heartbeat/config.json
+    networks:
+      asist_net:
+        aliases:
+          - heartbeat
+    entrypoint: ["python3", "heartbeat.py"]
