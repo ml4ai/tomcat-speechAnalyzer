@@ -74,14 +74,14 @@ void OpensmileClient::send_eoi(){
 }
 
 void OpensmileClient::loop(){
-	int num_bytes = -1;
+	int num_bytes = 256;
 	int len = -1;
 	while(this->looping){
 		// Recv num bytes
-		len = recv(this->sock, &num_bytes, sizeof(int), 0);
-		if(num_bytes > 1000 || len != 4){
+		//len = recv(this->sock, &num_bytes, sizeof(int), 0);
+		/*if(num_bytes > 1000 || len != 4){
 			continue;
-		}	
+		}*/	
 		// Recv string 
 		char c[num_bytes];
 		recv(this->sock, &c, num_bytes, 0);
