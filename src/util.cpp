@@ -39,9 +39,6 @@ void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
 	strcpy(text, temp.c_str());
 
 	OPENSMILE_MUTEX.lock();
-	// Send bytes 
-	//len = send(socket, &num_bytes, 4, 0);
-	
 	// Send message
 	len = send(socket, &text, num_bytes, 0);
 	OPENSMILE_MUTEX.unlock();

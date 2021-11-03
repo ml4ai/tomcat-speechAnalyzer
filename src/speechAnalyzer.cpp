@@ -56,7 +56,6 @@ namespace beast = boost::beast;     // from <boost/beast.hpp>
 namespace http = beast::http;       // from <boost/beast/http.hpp>
 namespace net = boost::asio;        // from <boost/asio.hpp>
 using tcp = net::ip::tcp;           // from <boost/asio/ip/tcp.hpp>
-//using tcp = boost::asio::ip::tcp;
 
 using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::Speech;

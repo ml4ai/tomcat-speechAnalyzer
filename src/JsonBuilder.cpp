@@ -67,7 +67,6 @@ void JsonBuilder::process_message(string message) {
 	    if (tmeta) {
 		if (temp.find("lld") != string::npos) {
 		    this->opensmile_history.push_back(this->opensmile_message);
-		    //std::cout << opensmile_history.size() << std::endl;
 		    this->opensmile_message["header"] =
 			create_common_header("observation");
 		    this->opensmile_message["msg"] = create_common_msg("openSMILE");
@@ -263,8 +262,6 @@ string JsonBuilder::process_mmc_message(string message){
 		// Receive the HTTP response
 		http::read(stream, buffer, res);
 
-		//this->mosquitto_client.publish("agent/asr/mcc", res.body().data());
-		
 		// Write the message to standard out
 
 		// Gracefully close the socket
