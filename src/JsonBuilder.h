@@ -1,13 +1,14 @@
 #pragma once
-#include <string>
-#include <thread>
-#include <vector>
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include "Mosquitto.h"
 #include "TrialListener.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <deque>
 #include <nlohmann/json.hpp>
 #include <smileapi/SMILEapi.h>
+#include <string>
+#include <thread>
+#include <vector>
 
 #include "arguments.h"
 class JsonBuilder {
@@ -21,7 +22,7 @@ class JsonBuilder {
     ~JsonBuilder();
 
     // Process an openSMILE log messag
-    void process_message(smilelogmsg_t message);
+    void process_message(std::string message);
 
     // Process an asr message
     void process_asr_message(
@@ -29,9 +30,10 @@ class JsonBuilder {
         std::string id);
 
     // Process a word/feature alignment message
-    void process_alignment_message(
+    std::string process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
+    std::string process_mmc_message(std::string message);
 
     // Process a audio chunk message
     void process_audio_chunk_message(std::vector<char> chunk, std::string id);
@@ -55,7 +57,7 @@ class JsonBuilder {
     std::vector<std::string> feature_list;
     bool tmeta = false;
     double sync_time = 0.0;
-    std::vector<nlohmann::json> opensmile_history;
+    std::deque<nlohmann::json> opensmile_history;
     std::vector<nlohmann::json> features_between(double start_time,
                                                  double end_time);
 

@@ -5,13 +5,16 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <thread>
 
 #include "JsonBuilder.h"
+#include "OpensmileSession.h"
 #include "SpeechWrapper.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
@@ -43,9 +46,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     std::atomic<bool> done{false};
     std::thread consumer_thread;
     std::thread asr_reader_thread;
-    std::thread opensmile_thread;
     JsonBuilder builder;
-    smileobj_t* handle;
     SpeechWrapper* speech_handler;
     process_real_cpu_clock::time_point stream_start;
     int samples_done = 0;
@@ -59,9 +60,17 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     bool is_initialized = false;
 
+    int increment = 0;
+
+    // Opensmile wrapper
+    OpensmileSession* opensmile_session;
+
   public:
     // Command line arguments
     static Arguments args;
+
+    // socket port
+    static int socket_port;
 
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
@@ -111,22 +120,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     void initialize() {
         // Initialize openSMILE
         if (!this->args.disable_opensmile) {
-            BOOST_LOG_TRIVIAL(info) << "Initializing openSMILE system";
-            OPENSMILE_MUTEX.lock();
-            this->handle = smile_new();
-            smileopt_t* options = NULL;
-            smile_initialize(this->handle,
-                             "conf/is09-13/IS13_ComParE.conf",
-                             0,
-                             options,
-                             1,
-                             0,
-                             0,
-                             0);
-            smile_set_log_callback(
-                this->handle, &log_callback, &(this->builder));
-            this->opensmile_thread = std::thread(smile_run, this->handle);
-            OPENSMILE_MUTEX.unlock();
+            BOOST_LOG_TRIVIAL(info) << "Initializing Opensmile";
+            this->socket_port++;
+            this->opensmile_session =
+                new OpensmileSession(this->socket_port, &this->builder);
         }
         // Initialize Speech Session
         if (!this->args.disable_asr) {
@@ -152,7 +149,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         while (!this->read_done) {
             while (spsc_queue.pop(chunk)) {
                 this->samples_done += 4096;
-
                 // Create f32 and i16 chunks
                 std::vector<float> float_chunk(chunk.size() / sizeof(float));
                 std::vector<int16_t> int_chunk(chunk.size() / sizeof(int16_t));
@@ -178,6 +174,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                     process_real_cpu_clock::time_point stream_current =
                         process_real_cpu_clock::now();
                     if (stream_current - this->stream_start > minutes{4}) {
+                        BOOST_LOG_TRIVIAL(info)
+                            << "Restarting google speech stream";
                         // Send writes_done and finish reading responses
                         this->speech_handler->send_writes_done();
                         this->asr_reader_thread.join();
@@ -199,30 +197,18 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                         this->stream_start = process_real_cpu_clock::now();
                     }
                 }
-                // Write to openSMILE
+                // Write to openSMILE process
                 if (!args.disable_opensmile) {
-                    while (true) {
-                        smileres_t result = smile_extaudiosource_write_data(
-                            this->handle,
-                            "externalAudioSource",
-                            (void*)&float_chunk[0],
-                            float_chunk.size() * sizeof(float));
-                        if (result == SMILE_SUCCESS) {
-                            break;
-                        }
-                    }
+                    this->opensmile_session->send_chunk(float_chunk);
                 }
             }
         }
-
         this->speech_handler->send_writes_done();
         this->asr_reader_thread.join();
         this->speech_handler->finish_stream();
 
         if (!this->args.disable_opensmile) {
-            smile_extaudiosource_set_external_eoi(this->handle,
-                                                  "externalAudioSource");
-            this->opensmile_thread.join();
+            this->opensmile_session->send_eoi();
         }
     }
 
@@ -251,42 +237,44 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
         boost::ignore_unused(bytes_transferred);
-
         if (ec) {
             BOOST_LOG_TRIVIAL(info) << "Connection has been closed";
             this->read_done = true;
         }
 
-        // Echo the message
-        this->ws_.text(this->ws_.got_text());
-        char* arr = new char[bytes_transferred];
-        boost::asio::buffer_copy(boost::asio::buffer(arr, bytes_transferred),
-                                 this->buffer_.data(),
-                                 bytes_transferred);
+        if (bytes_transferred != 0) {
+            // Echo the message
+            this->ws_.text(this->ws_.got_text());
+            char* arr = new char[bytes_transferred];
+            boost::asio::buffer_copy(
+                boost::asio::buffer(arr, bytes_transferred),
+                this->buffer_.data(),
+                bytes_transferred);
 
-        auto chunk = std::vector<char>(arr, arr + bytes_transferred);
-        delete arr;
+            auto chunk = std::vector<char>(arr, arr + bytes_transferred);
+            delete[] arr;
 
-        // Push chunk to queue for write_thread
-        while (!this->spsc_queue.push(chunk)) {
-        }
+            // Push the chunk to the queue for the write_thread
+            while (!this->spsc_queue.push(chunk)) {
+            }
+            // Send chunk for raw audio message
+            string id = to_string(this->increment);
+            this->increment++;
+            if (!args.disable_chunk_publishing) {
+                this->builder.process_audio_chunk_message(chunk, id);
+            }
+            if (!args.disable_chunk_metadata_publishing) {
+                this->builder.process_audio_chunk_metadata_message(chunk, id);
+            }
 
-        // Send chunk for raw audio message
-        string id = boost::uuids::to_string(boost::uuids::random_generator()());
-        if (!args.disable_chunk_publishing) {
-            this->builder.process_audio_chunk_message(chunk, id);
-        }
-        if (!args.disable_chunk_metadata_publishing) {
-            this->builder.process_audio_chunk_metadata_message(chunk, id);
-        }
+            // Clear the buffer
+            this->buffer_.consume(buffer_.size());
 
-        // Clear the buffer
-        this->buffer_.consume(buffer_.size());
-
-        // Initialize write_thread
-        if (!this->is_initialized) {
-            this->initialize();
-            BOOST_LOG_TRIVIAL(info) << "Begin reading chunks";
+            // Initialize write_thread
+            if (!this->is_initialized) {
+                this->initialize();
+                BOOST_LOG_TRIVIAL(info) << "Begin reading chunks";
+            }
         }
         // Do another read
         this->do_read();

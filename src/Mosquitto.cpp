@@ -1,5 +1,6 @@
 #include "Mosquitto.h"
 
+#include <boost/log/trivial.hpp>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <thread>
@@ -235,18 +236,18 @@ void Mosquitto::set_max_seconds_without_messages(
 }
 
 void MosquittoListener::on_message(const string& topic, const string& message) {
-    nlohmann::json m = nlohmann::json::parse(message);
-    if (m["msg"].contains("trial_id")) {
-        this->trial_id = m["msg"]["trial_id"];
+    try {
+        nlohmann::json m = nlohmann::json::parse(message);
+        if (m["msg"].contains("trial_id")) {
+            this->trial_id = m["msg"]["trial_id"];
+        }
+        if (m["msg"].contains("experiment_id")) {
+            this->experiment_id = m["msg"]["experiment_id"];
+        }
     }
-    if (m["msg"].contains("experiment_id")) {
-        this->experiment_id = m["msg"]["experiment_id"];
-    }
-    if (m["data"].contains("client_info")) {
-        /*	for(nlohmann::json client : m["data"]["client_info"]){
-                        if(client["participantid"].compare(this->playername) ==
-           0){ this->participant_id = client["participantid"];
-                        }
-                }*/
+    catch (nlohmann::json::exception e) {
+        BOOST_LOG_TRIVIAL(info)
+            << "An error occured parsing the following message: \n"
+            << "Topic: " << topic << "\nMessage: " << message;
     }
 }

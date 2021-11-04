@@ -17,6 +17,14 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+
+#include <boost/asio/connect.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
+#include <cstdlib>
+
 // Third Party Libraries
 #include "ChunkListener.h"
 #include "GlobalMosquittoListener.h"
@@ -43,7 +51,10 @@ namespace http = beast::http;
 namespace ws = beast::websocket;
 namespace asio = boost::asio;
 
-using tcp = boost::asio::ip::tcp;
+namespace beast = boost::beast; // from <boost/beast.hpp>
+namespace http = beast::http;   // from <boost/beast/http.hpp>
+namespace net = boost::asio;    // from <boost/asio.hpp>
+using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::Speech;
@@ -64,8 +75,10 @@ void write_thread(
 
 Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
+int WebsocketSession::socket_port;
 
 int main(int argc, char* argv[]) {
+
     // Enable Boost logging
     boost::log::add_console_log(std::cout,
                                 boost::log::keywords::auto_flush = true);
@@ -101,14 +114,14 @@ int main(int argc, char* argv[]) {
             "Disable the opensmile feature extraction system of the "
             "speechAnalyzer agent")(
             "disable_audio_writing",
-            value<bool>(&args.disable_audio_writing)->default_value(false),
+            value<bool>(&args.disable_audio_writing)->default_value(true),
             "Disable writing audio files for the speechAnalyzer agent")(
             "disable_chunk_publishing",
             value<bool>(&args.disable_chunk_publishing)->default_value(true),
             "Disable the publishing of audio chunks to the message bus")(
             "disable_chunk_metadata_publishing",
             value<bool>(&args.disable_chunk_metadata_publishing)
-                ->default_value(false),
+                ->default_value(true),
             "Disable the publishing of audio chunk  metadata to the message "
             "bus");
 
@@ -122,6 +135,7 @@ int main(int argc, char* argv[]) {
     }
     JsonBuilder::args = args;
     WebsocketSession::args = args;
+    WebsocketSession::socket_port = 15556;
 
     // Setup Global Listener
     GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
