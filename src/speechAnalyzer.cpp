@@ -106,9 +106,12 @@ int main(int argc, char* argv[]) {
             "sample_rate",
             value<int>(&args.sample_rate)->default_value(48000),
             "The sample rate of the input audio")(
-            "disable_asr",
-            value<bool>(&args.disable_asr)->default_value(false),
-            "Disable the asr system of the speechAnalyzer agent")(
+            "disable_asr_google",
+            value<bool>(&args.disable_asr_google)->default_value(false),
+            "Disable the google asr system of the speechAnalyzer agent")(
+            "disable_asr_vosk",
+            value<bool>(&args.disable_asr_vosk)->default_value(false),
+            "Disable the vosk asr system of the speechAnalyzer agent")(
             "disable_opensmile",
             value<bool>(&args.disable_opensmile)->default_value(true),
             "Disable the opensmile feature extraction system of the "

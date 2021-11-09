@@ -16,7 +16,8 @@ struct Arguments {
     int sample_rate;
 
     // Disable systems
-    bool disable_asr;
+    bool disable_asr_google;
+    bool disable_asr_vosk;
     bool disable_opensmile;
     bool disable_audio_writing;
     bool disable_chunk_publishing;
