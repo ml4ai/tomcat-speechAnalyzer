@@ -1,0 +1,32 @@
+{
+	"version_info":{
+		"agent_name": "speech_analyzer_agent",
+		"version": "3.0.2",
+		"owner": "UAZ",
+		"config": [],	
+		"publishes": [
+			{
+			    "topic": "agent/asr/intermediate",
+			    "message_type": "observation",
+			    "sub_type":  "asr:transcription"
+			},
+			{
+			    "topic": "agent/asr/final",
+			    "message_type": "observation",
+			    "sub_type":  "asr:transcription"
+			}
+		],
+		"subscribes": [
+			{
+			    "topic": "trial",
+			    "message_type": "trial",
+			    "sub_type": "start"
+			},
+			{
+			    "topic": "trial",
+			    "message_type": "trial",
+			    "sub_type": "stop"
+			}
+		] 
+	}
+}

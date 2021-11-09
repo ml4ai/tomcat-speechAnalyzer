@@ -17,6 +17,15 @@ services:
         aliases:
           - speech_analyzer_agent
     entrypoint: ./speechAnalyzer --mode websocket --disable_opensmile false
+  vosk:
+    image: alphacep/kaldi-en:latest
+    container_name: vosk
+    ports:
+      - 2700:2700
+    networks:
+      asist_net:
+        aliases:
+          - vosk
   mmc:
     image: mmc:1.0.0
     container_name: mmc
