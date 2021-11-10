@@ -16,6 +16,7 @@
 #include "JsonBuilder.h"
 #include "OpensmileSession.h"
 #include "SpeechWrapper.h"
+#include "SpeechWrapperVosk.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <range/v3/all.hpp>
@@ -48,6 +49,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     std::thread asr_reader_thread;
     JsonBuilder builder;
     SpeechWrapper* speech_handler;
+    SpeechWrapperVosk* speech_handler_vosk;
     process_real_cpu_clock::time_point stream_start;
     int samples_done = 0;
     int sample_rate = 48000;
@@ -140,7 +142,9 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         }
 	// Initialize Vosk Speech session
 	if(!this->args.disable_asr_vosk){
-
+            	BOOST_LOG_TRIVIAL(info) << "Initializing Vosk Speech  system";
+		this->speech_handler_vosk = new SpeechWrapperVosk(this->sample_rate);
+		this->speech_handler_vosk->start_stream();
 	};
         BOOST_LOG_TRIVIAL(info) << "Starting write_thread";
         this->consumer_thread = std::thread([this] { this->write_thread(); });
