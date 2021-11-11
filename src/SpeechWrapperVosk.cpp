@@ -34,7 +34,7 @@ void SpeechWrapperVosk::end_stream(){
 	// Stop read thread 
 	this->running = false;
 	this->read_thread.join();
-
+	
 	// Close websocket
 	this->ws->close(websocket::close_code::normal);
 }
@@ -86,6 +86,5 @@ void SpeechWrapperVosk::send_chunk(vector<int16_t> int_chunk){
 }
 void SpeechWrapperVosk::send_writes_done(){
 	// Send end of file
-	this->ws->text(true);
         ws->write(net::buffer("{\"eof\" : 1}"));
 }

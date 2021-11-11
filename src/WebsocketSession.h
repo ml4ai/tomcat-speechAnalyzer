@@ -217,10 +217,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             }
         }
         this->speech_handler->send_writes_done();
-	this->speech_handler_vosk->send_writes_done();
-
         this->asr_reader_thread.join();
         this->speech_handler->finish_stream();
+
+	this->speech_handler_vosk->send_writes_done();	
 	this->speech_handler_vosk->end_stream();
 
         if (!this->args.disable_opensmile) {
