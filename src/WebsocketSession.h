@@ -208,7 +208,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
 		// Write to Vosk asr service
 		if (!this->args.disable_asr_vosk){
-
+			this->speech_handler_vosk->send_chunk(int_chunk);
 		}
                 // Write to openSMILE process
                 if (!args.disable_opensmile) {
@@ -217,8 +217,11 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             }
         }
         this->speech_handler->send_writes_done();
+	this->speech_handler_vosk->send_writes_done();
+
         this->asr_reader_thread.join();
         this->speech_handler->finish_stream();
+	this->speech_handler_vosk->end_stream();
 
         if (!this->args.disable_opensmile) {
             this->opensmile_session->send_eoi();
