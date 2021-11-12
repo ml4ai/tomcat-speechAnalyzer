@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 
+#include "JsonBuilder.h"
 #include <nlohmann/json.hpp>
 
 #include <boost/beast/core.hpp>
@@ -19,8 +20,9 @@ namespace net = boost::asio;            // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 using namespace std;
 
-SpeechWrapperVosk::SpeechWrapperVosk(int sample_rate) {
+SpeechWrapperVosk::SpeechWrapperVosk(int sample_rate, JsonBuilder *builder) {
         this->sample_rate = sample_rate;
+	this->builder = builder;
 }
 SpeechWrapperVosk::~SpeechWrapperVosk() {
         free(this->ws);
@@ -65,7 +67,7 @@ void SpeechWrapperVosk::initialize_stream(){
 		beast::flat_buffer buffer;
 		while(this->running){
 			this->ws->read(buffer);
-			std::cout << beast::make_printable(buffer.data()) << std::endl;
+			this->builder->process_asr_message_vosk(beast::buffers_to_string(buffer.data()));
 			buffer.consume(buffer.size());
 		}
 	});

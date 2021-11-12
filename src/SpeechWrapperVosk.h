@@ -2,6 +2,8 @@
 #include <thread>
 #include <vector>
 
+#include "JsonBuilder.h"
+
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/connect.hpp>
@@ -18,7 +20,7 @@ using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 class SpeechWrapperVosk {
 	public:
-        	SpeechWrapperVosk(int sample_rate);
+        	SpeechWrapperVosk(int sample_rate, JsonBuilder *builder);
 		~SpeechWrapperVosk();
 		void start_stream();
 		void end_stream();
@@ -26,7 +28,7 @@ class SpeechWrapperVosk {
 		void send_writes_done();
 	private:
 		bool running = false;
-
+		JsonBuilder *builder;
 		// Websocket session
 		std::string host = "vosk";
 		std::string port = "2700";

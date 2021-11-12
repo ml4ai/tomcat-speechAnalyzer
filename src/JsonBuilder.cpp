@@ -52,6 +52,8 @@ JsonBuilder::JsonBuilder() {
     // Set the start time for the stream
     this->stream_start_time =
         boost::posix_time::microsec_clock::universal_time();
+    this->stream_start_time_vosk =
+        boost::posix_time::microsec_clock::universal_time();
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -164,6 +166,64 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
         this->mosquitto_client.publish("agent/asr/intermediate",
                                        message.dump());
     }
+}
+
+// Data for handling google asr messages
+void JsonBuilder::process_asr_message_vosk(std::string response){
+    try{
+	    nlohmann::json message;
+	    message["header"] = create_common_header("observation");
+	    message["msg"] = create_common_msg("asr:transcription");
+	    
+	    message["data"]["asr_system"] = "vosk";
+	    message["data"]["participant_id"] = this->participant_id;
+	    message["data"]["id"] = "NA";
+
+	    nlohmann::json response_message = nlohmann::json::parse(response);
+	    if(response_message.contains("partial")){
+		// Handle intermediate transcription
+		message["data"]["is_final"] = false; 
+		message["data"]["text"] = response_message["partial"];
+	    }
+	    else if(response_message.contains("alternatives")){
+		vector<nlohmann::json> alternatives = response_message["alternatives"];
+		vector<nlohmann::json> words = alternatives[0]["result"];
+		// Handle final transcription
+		message["data"]["is_final"] = true; 
+		message["data"]["text"] = response_message["alternatives"][0]["text"]; 
+
+		double start_offset = words[0]["start"];
+		double end_offset = words[words.size()-1]["end"];
+		boost::posix_time::ptime start_timestamp = this->stream_start_time_vosk + boost::posix_time::seconds((int)start_offset);
+		boost::posix_time::ptime end_timestamp = this->stream_start_time_vosk + boost::posix_time::seconds((int)end_offset);
+		message["data"]["start_time"] = boost::posix_time::to_iso_extended_string(start_timestamp) + "Z"; 
+		message["data"]["end_time"] = boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
+
+		// Add transcription alternatives
+		for(int i=0;i<alternatives.size();i++){
+			alternatives[i].erase("result");
+		}
+		message["data"]["alternatives"] = alternatives;	
+	    }
+	    else{
+		std::cout << response << std::endl;
+	    }
+	    
+	    // Publish message
+	    if (message["data"]["is_final"]) {
+		this->mosquitto_client.publish("agent/asr/final", message.dump());
+		std::cout << message.dump() << std::endl;
+	    }
+	    else {
+		this->mosquitto_client.publish("agent/asr/intermediate",
+					       message.dump());
+	    }
+	}
+	catch(std::exception const&e){
+		std::cout << "!!!!!!!!!!!!!!!!!"<< std::endl;
+		std::cout << response<< std::endl;
+		std::cout << "!!!!!!!!!!!!!!!!!"<< std::endl;
+	}
 }
 
 // Data for handling word/feature alignment messages

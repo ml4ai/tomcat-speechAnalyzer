@@ -143,7 +143,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 	// Initialize Vosk Speech session
 	if(!this->args.disable_asr_vosk){
             	BOOST_LOG_TRIVIAL(info) << "Initializing Vosk Speech  system";
-		this->speech_handler_vosk = new SpeechWrapperVosk(this->sample_rate);
+		this->speech_handler_vosk = new SpeechWrapperVosk(this->sample_rate, &builder);
 		this->speech_handler_vosk->start_stream();
 	};
         BOOST_LOG_TRIVIAL(info) << "Starting write_thread";

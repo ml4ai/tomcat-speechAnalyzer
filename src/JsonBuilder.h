@@ -29,6 +29,10 @@ class JsonBuilder {
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
 
+    // Process an asr message from vosk
+    void process_asr_message_vosk(
+        std::string response);
+     
     // Process a word/feature alignment message
     std::string process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
@@ -46,6 +50,7 @@ class JsonBuilder {
   private:
     // Time object for start of stream
     boost::posix_time::ptime stream_start_time;
+    boost::posix_time::ptime stream_start_time_vosk;
 
     // Mosquitto client objects
     Mosquitto mosquitto_client;
