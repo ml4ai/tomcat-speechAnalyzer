@@ -16,7 +16,7 @@ services:
       asist_net:
         aliases:
           - speech_analyzer_agent
-    entrypoint: ./speechAnalyzer --mode websocket --disable_asr_google true --disable_opensmile false
+    entrypoint: ./speechAnalyzer --mode websocket --disable_opensmile false
   vosk:
     image: alphacep/kaldi-en:latest
     container_name: vosk
