@@ -177,8 +177,7 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 	    
 	    message["data"]["asr_system"] = "vosk";
 	    message["data"]["participant_id"] = this->participant_id;
-	    message["data"]["id"] = "NA";
-
+	    message["data"]["id"] = boost::uuids::to_string(boost::uuids::random_generator()());
 	    nlohmann::json response_message = nlohmann::json::parse(response);
 	    if(response_message.contains("partial")){
 		// Handle intermediate transcription
@@ -206,7 +205,7 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 		message["data"]["alternatives"] = alternatives;	
 	    }
 	    else{
-		std::cout << response << std::endl;
+		return;
 	    }
 	    
 	    // Publish message
@@ -220,9 +219,8 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 	    }
 	}
 	catch(std::exception const&e){
-		std::cout << "!!!!!!!!!!!!!!!!!"<< std::endl;
+		std::cout << "Invalid Vosk message: " << std::endl;
 		std::cout << response<< std::endl;
-		std::cout << "!!!!!!!!!!!!!!!!!"<< std::endl;
 	}
 }
 
