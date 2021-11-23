@@ -67,8 +67,9 @@ void SpeechWrapperVosk::initialize_stream(){
 		beast::flat_buffer buffer;
 		while(this->running){
 			this->ws->read(buffer);
-			this->builder->process_asr_message_vosk(beast::buffers_to_string(buffer.data()));
+			string response = beast::buffers_to_string(buffer.data());
 			buffer.consume(buffer.size());
+			this->builder->process_asr_message_vosk(response);
 		}
 	});
 }
