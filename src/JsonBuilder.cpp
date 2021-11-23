@@ -155,10 +155,18 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
+	// Handle sentiment data 
         string features = this->process_alignment_message(response, id);
         string mmc = this->process_mmc_message(features);
-        message["data"]["features"] = nlohmann::json::parse(features);
         message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+
+	// Handle features data
+	nlohmann::json temp = nlohmann::json::parse(features)["data"];
+	for(int i=0;i<temp["word_messages"].size(); i++){
+		string f = temp["word_messages"][i]["features"];
+		temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
+	}
+	message["data"]["features"] = temp;
 
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
@@ -211,7 +219,6 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 	    // Publish message
 	    if (message["data"]["is_final"]) {
 		this->mosquitto_client.publish("agent/asr/final", message.dump());
-		std::cout << message.dump() << std::endl;
 	    }
 	    else {
 		this->mosquitto_client.publish("agent/asr/intermediate",
@@ -224,16 +231,16 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 	}
 }
 
-// Data for handling word/feature alignment messages
-string
-JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
+string JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                        string id) {
     nlohmann::json message;
-    message["text"] = response.results(0).alternatives(0).transcript();
-    message["utterance_id"] = id;
-    message["id"] =
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("asr:alignment");
+    message["data"]["text"] = response.results(0).alternatives(0).transcript();
+    message["data"]["utterance_id"] = id;
+    message["data"]["id"] =
         boost::uuids::to_string(boost::uuids::random_generator()());
-    message["time_interval"] = 0.01;
+    message["data"]["time_interval"] = 0.01;
     vector<nlohmann::json> word_messages;
     auto result = response.results(0);
     for (int i = 0; i < result.alternatives_size(); i++) {
@@ -273,14 +280,15 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             word_message["word"] = current_word;
             word_message["start_time"] = start_time;
             word_message["end_time"] = end_time;
-            word_message["features"] = features_output;
+            word_message["features"] = features_output.dump();
             word_messages.push_back(word_message);
         }
     }
-    message["word_messages"] = word_messages;
+    message["data"]["word_messages"] = word_messages;
     return message.dump();
 }
 
+// Data for handling word/feature alignment messages
 string JsonBuilder::process_mmc_message(string message) {
     try {
         string host = "mmc";
