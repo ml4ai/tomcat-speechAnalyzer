@@ -52,6 +52,8 @@ JsonBuilder::JsonBuilder() {
     // Set the start time for the stream
     this->stream_start_time =
         boost::posix_time::microsec_clock::universal_time();
+    this->stream_start_time_vosk =
+        boost::posix_time::microsec_clock::universal_time();
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -153,10 +155,18 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
+	// Handle sentiment data 
         string features = this->process_alignment_message(response, id);
         string mmc = this->process_mmc_message(features);
-        message["data"]["features"] = nlohmann::json::parse(features);
         message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+
+	// Handle features data
+	nlohmann::json temp = nlohmann::json::parse(features)["data"];
+	for(int i=0;i<temp["word_messages"].size(); i++){
+		string f = temp["word_messages"][i]["features"];
+		temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
+	}
+	message["data"]["features"] = temp;
 
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
@@ -166,9 +176,62 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
 }
 
-// Data for handling word/feature alignment messages
-string
-JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
+// Data for handling google asr messages
+void JsonBuilder::process_asr_message_vosk(std::string response){
+    try{
+	    nlohmann::json message;
+	    message["header"] = create_common_header("observation");
+	    message["msg"] = create_common_msg("asr:transcription");
+	    
+	    message["data"]["asr_system"] = "vosk";
+	    message["data"]["participant_id"] = this->participant_id;
+	    message["data"]["id"] = boost::uuids::to_string(boost::uuids::random_generator()());
+	    nlohmann::json response_message = nlohmann::json::parse(response);
+	    if(response_message.contains("partial")){
+		// Handle intermediate transcription
+		message["data"]["is_final"] = false; 
+		message["data"]["text"] = response_message["partial"];
+	    }
+	    else if(response_message.contains("alternatives")){
+		vector<nlohmann::json> alternatives = response_message["alternatives"];
+		vector<nlohmann::json> words = alternatives[0]["result"];
+		// Handle final transcription
+		message["data"]["is_final"] = true; 
+		message["data"]["text"] = response_message["alternatives"][0]["text"]; 
+
+		double start_offset = words[0]["start"];
+		double end_offset = words[words.size()-1]["end"];
+		boost::posix_time::ptime start_timestamp = this->stream_start_time_vosk + boost::posix_time::seconds((int)start_offset);
+		boost::posix_time::ptime end_timestamp = this->stream_start_time_vosk + boost::posix_time::seconds((int)end_offset);
+		message["data"]["start_time"] = boost::posix_time::to_iso_extended_string(start_timestamp) + "Z"; 
+		message["data"]["end_time"] = boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
+
+		// Add transcription alternatives
+		for(int i=0;i<alternatives.size();i++){
+			alternatives[i].erase("result");
+		}
+		message["data"]["alternatives"] = alternatives;	
+	    }
+	    else{
+		return;
+	    }
+	    
+	    // Publish message
+	    if (message["data"]["is_final"]) {
+		this->mosquitto_client.publish("agent/asr/final", message.dump());
+	    }
+	    else {
+		this->mosquitto_client.publish("agent/asr/intermediate",
+					       message.dump());
+	    }
+	}
+	catch(std::exception const&e){
+		std::cout << "Invalid Vosk message: " << std::endl;
+		std::cout << response<< std::endl;
+	}
+}
+
+string JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                        string id) {
     nlohmann::json message;
     message["header"] = create_common_header("observation");
@@ -225,6 +288,7 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
     return message.dump();
 }
 
+// Data for handling word/feature alignment messages
 string JsonBuilder::process_mmc_message(string message) {
     try {
         string host = "mmc";
@@ -358,7 +422,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "0.1";
+    message["version"] = "3.1.0";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 

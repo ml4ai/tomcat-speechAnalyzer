@@ -16,6 +16,7 @@
 #include "JsonBuilder.h"
 #include "OpensmileSession.h"
 #include "SpeechWrapper.h"
+#include "SpeechWrapperVosk.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <range/v3/all.hpp>
@@ -48,6 +49,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     std::thread asr_reader_thread;
     JsonBuilder builder;
     SpeechWrapper* speech_handler;
+    SpeechWrapperVosk* speech_handler_vosk;
     process_real_cpu_clock::time_point stream_start;
     int samples_done = 0;
     int sample_rate = 48000;
@@ -125,8 +127,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             this->opensmile_session =
                 new OpensmileSession(this->socket_port, &this->builder);
         }
-        // Initialize Speech Session
-        if (!this->args.disable_asr) {
+        // Initialize Google Speech Session
+        if (!this->args.disable_asr_google) {
             BOOST_LOG_TRIVIAL(info) << "Initializing Google Speech  system";
             this->speech_handler = new SpeechWrapper(false, this->sample_rate);
             this->speech_handler->start_stream();
@@ -138,6 +140,12 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                             speech_handler->streamer.get(),
                             &(this->builder));
         }
+	// Initialize Vosk Speech session
+	if(!this->args.disable_asr_vosk){
+            	BOOST_LOG_TRIVIAL(info) << "Initializing Vosk Speech  system";
+		this->speech_handler_vosk = new SpeechWrapperVosk(this->sample_rate, &builder);
+		this->speech_handler_vosk->start_stream();
+	};
         BOOST_LOG_TRIVIAL(info) << "Starting write_thread";
         this->consumer_thread = std::thread([this] { this->write_thread(); });
         this->is_initialized = true;
@@ -168,7 +176,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
 
                 // Write to google asr service
-                if (!this->args.disable_asr) {
+                if (!this->args.disable_asr_google) {
                     this->speech_handler->send_chunk(int_chunk);
                     // Check if asr stream needs to be restarted
                     process_real_cpu_clock::time_point stream_current =
@@ -197,16 +205,28 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                         this->stream_start = process_real_cpu_clock::now();
                     }
                 }
+
+		// Write to Vosk asr service
+		if (!this->args.disable_asr_vosk){
+			this->speech_handler_vosk->send_chunk(int_chunk);
+		}
                 // Write to openSMILE process
                 if (!args.disable_opensmile) {
                     this->opensmile_session->send_chunk(float_chunk);
                 }
             }
         }
-        this->speech_handler->send_writes_done();
-        this->asr_reader_thread.join();
-        this->speech_handler->finish_stream();
+	// Cleanup subsystems
+        if(!this->args.disable_asr_google){
+		this->speech_handler->send_writes_done();
+		this->asr_reader_thread.join();
+		this->speech_handler->finish_stream();
+	}
 
+	if(!this->args.disable_asr_vosk){
+		this->speech_handler_vosk->send_writes_done();	
+		this->speech_handler_vosk->end_stream();
+	}
         if (!this->args.disable_opensmile) {
             this->opensmile_session->send_eoi();
         }
