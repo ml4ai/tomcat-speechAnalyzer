@@ -229,13 +229,11 @@ string
 JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                                        string id) {
     nlohmann::json message;
-    message["header"] = create_common_header("observation");
-    message["msg"] = create_common_msg("asr:alignment");
-    message["data"]["text"] = response.results(0).alternatives(0).transcript();
-    message["data"]["utterance_id"] = id;
-    message["data"]["id"] =
+    message["text"] = response.results(0).alternatives(0).transcript();
+    message["utterance_id"] = id;
+    message["id"] =
         boost::uuids::to_string(boost::uuids::random_generator()());
-    message["data"]["time_interval"] = 0.01;
+    message["time_interval"] = 0.01;
     vector<nlohmann::json> word_messages;
     auto result = response.results(0);
     for (int i = 0; i < result.alternatives_size(); i++) {
@@ -275,11 +273,11 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             word_message["word"] = current_word;
             word_message["start_time"] = start_time;
             word_message["end_time"] = end_time;
-            word_message["features"] = features_output.dump();
+            word_message["features"] = features_output;
             word_messages.push_back(word_message);
         }
     }
-    message["data"]["word_messages"] = word_messages;
+    message["word_messages"] = word_messages;
     return message.dump();
 }
 
@@ -416,7 +414,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "0.1";
+    message["version"] = "3.0.3";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
