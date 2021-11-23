@@ -66,10 +66,16 @@ void SpeechWrapperVosk::initialize_stream(){
 	this->read_thread = std::thread([this](){
 		beast::flat_buffer buffer;
 		while(this->running){
-			this->ws->read(buffer);
-			string response = beast::buffers_to_string(buffer.data());
-			buffer.consume(buffer.size());
-			this->builder->process_asr_message_vosk(response);
+			try{
+				this->ws->read(buffer);
+				string response = beast::buffers_to_string(buffer.data());
+				buffer.consume(buffer.size());
+				this->builder->process_asr_message_vosk(response);
+			}
+			catch(std::exception const &e){
+				std::cout << "Vosk container failure" << std::endl;
+				this->running = false;
+			}
 		}
 	});
 }
