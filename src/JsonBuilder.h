@@ -37,6 +37,7 @@ class JsonBuilder {
     std::string process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
+    std::string process_alignment_message_vosk(nlohmann::json response, std::string id);
     std::string process_mmc_message(std::string message);
 
     // Process a audio chunk message
