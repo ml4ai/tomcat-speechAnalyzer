@@ -176,7 +176,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
 }
 
-// Data for handling google asr messages
+// Data for handling vosk asr messages
 void JsonBuilder::process_asr_message_vosk(std::string response){
     try{
 	    nlohmann::json message;
@@ -199,6 +199,7 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 		message["data"]["is_final"] = true; 
 		message["data"]["text"] = response_message["alternatives"][0]["text"]; 
 
+		// Handle timestamps
 		double start_offset = words[0]["start"];
 		double end_offset = words[words.size()-1]["end"];
 		boost::posix_time::ptime start_timestamp = this->stream_start_time_vosk + boost::posix_time::seconds((int)start_offset);
@@ -211,6 +212,19 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 			alternatives[i].erase("result");
 		}
 		message["data"]["alternatives"] = alternatives;	
+
+		// Add vocalic features and sentiment
+		string features = this->process_alignment_message_vosk(response_message, message["data"]["id"]);
+		string mmc = this->process_mmc_message(features);
+		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+
+		// Handle features data
+		nlohmann::json temp = nlohmann::json::parse(features)["data"];
+		for(int i=0;i<temp["word_messages"].size(); i++){
+			string f = temp["word_messages"][i]["features"];
+			temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
+		}
+		message["data"]["features"] = temp;
 	    }
 	    else{
 		return;
@@ -226,6 +240,7 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 	    }
 	}
 	catch(std::exception const&e){
+		std::cout << e.what() << std::endl;
 		std::cout << "Invalid Vosk message: " << std::endl;
 		std::cout << response<< std::endl;
 	}
@@ -256,6 +271,62 @@ string JsonBuilder::process_alignment_message(StreamingRecognizeResponse respons
             double end_time =
                 this->sync_time + end_seconds + (end_nanos / 1000000000.0);
             string current_word = word.word();
+            // Get extracted features message history
+            vector<nlohmann::json> history =
+                this->features_between(start_time, end_time);
+            // Initialize the features output by creating a vector for each
+            // feature
+            nlohmann::json features_output;
+            if (history.size() == 0) {
+                features_output = nullptr;
+            }
+            else {
+                for (auto& it : history[0].items()) {
+                    features_output[it.key()] = vector<double>();
+                }
+                // Load the features output from the history entries
+                for (auto entry : history) {
+                    for (auto& it : history[0].items()) {
+                        features_output[it.key()].push_back(entry[it.key()]);
+                    }
+                }
+            }
+            nlohmann::json word_message;
+            word_message["word"] = current_word;
+            word_message["start_time"] = start_time;
+            word_message["end_time"] = end_time;
+            word_message["features"] = features_output.dump();
+            word_messages.push_back(word_message);
+        }
+    }
+    message["data"]["word_messages"] = word_messages;
+    return message.dump();
+}
+
+string JsonBuilder::process_alignment_message_vosk(nlohmann::json response,
+                                       string id) {
+    nlohmann::json message;
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("asr:alignment");
+    message["data"]["text"] = response["alternatives"][0]["text"];
+    message["data"]["utterance_id"] = id;
+    message["data"]["id"] =
+        boost::uuids::to_string(boost::uuids::random_generator()());
+    message["data"]["time_interval"] = 0.01;
+    vector<nlohmann::json> word_messages;
+    for (int i = 0; i < 1; i++) {
+	vector<nlohmann::json> alternative = response["alternatives"][i]["result"];
+        for (nlohmann::json word : alternative) {
+            int64_t start_seconds = word["start"];
+            int32_t start_nanos = 0;//word.start_time().nanos();
+            int64_t end_seconds = word["end"];
+            int32_t end_nanos = 0;//word.end_time().nanos();
+	
+            double start_time =
+                this->sync_time + start_seconds + (start_nanos / 1000000000.0);
+            double end_time =
+                this->sync_time + end_seconds + (end_nanos / 1000000000.0);
+            string current_word = word["word"];
             // Get extracted features message history
             vector<nlohmann::json> history =
                 this->features_between(start_time, end_time);
