@@ -11,6 +11,8 @@
 #include <vector>
 
 #include "arguments.h"
+#include "DBWrapper.h"
+
 class JsonBuilder {
   public:
     static Arguments args;
@@ -66,6 +68,8 @@ class JsonBuilder {
     std::deque<nlohmann::json> opensmile_history;
     std::vector<nlohmann::json> features_between(double start_time,
                                                  double end_time);
+    // DBWrapper object
+    DBWrapper postgres;
 
     // Functions for creating cmomon message types
     nlohmann::json create_common_header(std::string message_type);

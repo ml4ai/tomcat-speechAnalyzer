@@ -54,6 +54,9 @@ JsonBuilder::JsonBuilder() {
         boost::posix_time::microsec_clock::universal_time();
     this->stream_start_time_vosk =
         boost::posix_time::microsec_clock::universal_time();
+
+   // Initialize postgres connection
+   //this->postgres.initialize();
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -61,6 +64,8 @@ JsonBuilder::~JsonBuilder() {
     this->mosquitto_client.close();
     this->listener_client.close();
     this->listener_client_thread.join();
+
+    //this->postgres.shutdown();
 }
 
 void JsonBuilder::process_message(string message) {
@@ -69,6 +74,7 @@ void JsonBuilder::process_message(string message) {
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
             this->opensmile_history.push_back(this->opensmile_message);
+	    this->postgres.publish_chunk(this->opensmile_message);
             this->opensmile_message["header"] =
                 create_common_header("observation");
             this->opensmile_message["msg"] = create_common_msg("openSMILE");
@@ -465,6 +471,7 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
             out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
         }
     }
+    this->opensmile_history.clear();
     return out;
 }
 
