@@ -16,7 +16,9 @@ RUN apt-get update -y && apt-get upgrade -y && \
     # nlohmann::json
     apt-get install nlohmann-json3-dev -y && \
     # Mosquitto
-    apt-get install mosquitto mosquitto-clients libmosquitto-dev -y
+    apt-get install mosquitto mosquitto-clients libmosquitto-dev -y && \
+    # PostgreSQL
+    apt-get install libpq-dev postgresql-server-dev-all -y
 
 #Install protobuf and grpc
 ENV GRPC_RELEASE_TAG v1.35.x

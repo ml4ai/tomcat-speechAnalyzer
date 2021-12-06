@@ -35,6 +35,29 @@ services:
           - mmc
     entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
 
+  db:
+    image: postgres-test
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: docker
+      POSTGRES_USER: postgres
+      POSTGRES_DB: features 
+    ports:
+      - 63332:5432
+    networks:
+      asist_net:
+        aliases:
+          - features_db
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 63333:8080
+    networks:
+      asist_net:
+        aliases:
+          - features_adminer
   heartbeat:
     image: heartbeat:latest
     container_name: heartbeat

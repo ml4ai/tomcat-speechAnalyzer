@@ -2,7 +2,7 @@ project(speechAnalyzer)
 
 cmake_minimum_required(VERSION 3.15)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_definitions(BOOST_DATE_TIME_POSIX_TIME_STD_CONFIG)
@@ -24,7 +24,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(SMILEapi REQUIRED)
 find_package(Mosquitto REQUIRED)
 find_package(range-v3 REQUIRED)
-
+find_package(PostgreSQL REQUIRED)
 
 option(BUILD_GOOGLE_CLOUD_SPEECH_LIB "Build google_cloud_speech library" ON)
 
@@ -47,16 +47,21 @@ add_executable(speechAnalyzer
     src/OpensmileSession.cpp
     src/SpeechWrapper.cpp
     src/SpeechWrapperVosk.cpp
+    src/DBWrapper.cpp
     src/util.cpp
     src/base64.c
 )
-
+target_include_directories(
+    speechAnalyzer PRIVATE
+    ${PostgreSQL_INCLUDE_DIRS} 
+)
 target_link_libraries(
     speechAnalyzer 
     SMILEapi 
     nlohmann_json::nlohmann_json
     ${Mosquitto_LIBRARIES}
     ${Boost_LIBRARIES}
+    ${PostgreSQL_LIBRARIES}
     -pthread
     google_cloud_speech
 )
