@@ -56,7 +56,8 @@ JsonBuilder::JsonBuilder() {
         boost::posix_time::microsec_clock::universal_time();
 
    // Initialize postgres connection
-   //this->postgres.initialize();
+//   this->postgres.initialize();
+   this->postgres.participant_id = this->participant_id;
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -65,7 +66,8 @@ JsonBuilder::~JsonBuilder() {
     this->listener_client.close();
     this->listener_client_thread.join();
 
-    //this->postgres.shutdown();
+    // Close postgres connection
+    this->postgres.shutdown();
 }
 
 void JsonBuilder::process_message(string message) {
@@ -161,6 +163,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
+	/*
 	// Handle sentiment data 
         string features = this->process_alignment_message(response, id);
         string mmc = this->process_mmc_message(features);
@@ -173,7 +176,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 		temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
 	}
 	message["data"]["features"] = temp;
-
+	*/
         this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
     else {
@@ -220,7 +223,7 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 		message["data"]["alternatives"] = alternatives;	
 
 		// Add vocalic features and sentiment
-		string features = this->process_alignment_message_vosk(response_message, message["data"]["id"]);
+		/*string features = this->process_alignment_message_vosk(response_message, message["data"]["id"]);
 		string mmc = this->process_mmc_message(features);
 		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
 
@@ -230,7 +233,7 @@ void JsonBuilder::process_asr_message_vosk(std::string response){
 			string f = temp["word_messages"][i]["features"];
 			temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
 		}
-		message["data"]["features"] = temp;
+		message["data"]["features"] = temp;*/
 	    }
 	    else{
 		return;
