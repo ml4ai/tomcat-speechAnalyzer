@@ -22,9 +22,13 @@ DBWrapper::~DBWrapper(){
 
 void DBWrapper::initialize(){
 	// Create connection string
-	string connection_string = "user=" + this->user + " password= " + this->pass + " dbname=" + this->db;
+	string connection_string = "host=" + this->host + " port=" + this->port + " user=" + this->user + " password= " + this->pass;
 	// Create connection
-	this->conn = PQconnectdb(connection_string.c_str());	
+	this->conn = PQconnectdb(connection_string.c_str());
+	if (PQstatus(conn) != CONNECTION_OK)
+        {
+		std::cout<< PQerrorMessage(conn) << std::endl;
+        }
 }
 void DBWrapper::shutdown(){
 	// End connection
@@ -38,14 +42,24 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 		columns.push_back(this->format_to_db_string(element.key()));
 		values.push_back(element.value());		
 	}
-	
-	// Convert columns and values to string format
-	ostringstream oss;
-	copy(begin(columns), end(columns), ostream_iterator<string>(oss, ","));
-	string column_string = oss.str();
-	oss.clear();
 
-	copy(begin(values), end(values), ostream_iterator<double>(oss, ","));
+	// Get timestamp
+	this->timestamp = message["data"]["tmeta"]["time"];
+
+	// Convert columns to string format
+	ostringstream oss;
+	for(string element : columns){
+		oss << element << ",";
+	}
+	oss << "participant, " << "timestamp";
+	string column_string = oss.str();
+	oss.str("");
+
+	// Convert values to string format
+	for(double element : values){
+		oss << to_string(element) << ",";
+	}
+	oss << this->participant_id << "," << this->timestamp;
 	string value_string = oss.str();
 
 	// Generate sql query
@@ -58,11 +72,11 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 	std::cout << query << std::endl;
 	// Send query
 	PGresult *result = PQexec(this->conn, query.c_str());
-	std::cout << query << std::endl;
 	
 }
 
 string DBWrapper::format_to_db_string(std::string in){
+	boost::replace_all(in, ")", "");
 	for(char c : this->INVALID_COLUMN_CHARACTERS){
 		boost::replace_all(in, string(1,c), "_");
 	}
