@@ -8,11 +8,12 @@
 #include <libpq-fe.h>
 #include <nlohmann/json.hpp>
 
+#include "GlobalMosquittoListener.h"
 #include "DBWrapper.h"
 
 using namespace std;
 
-const vector<char> DBWrapper::INVALID_COLUMN_CHARACTERS = {'+','-','(',')','\n'}; 
+const vector<char> DBWrapper::INVALID_COLUMN_CHARACTERS = {'+','-','(',')','\n', '.'}; 
 
 DBWrapper::DBWrapper(){
 }
@@ -22,7 +23,7 @@ DBWrapper::~DBWrapper(){
 
 void DBWrapper::initialize(){
 	// Create connection string
-	string connection_string = "host=" + this->host + " port=" + this->port + " user=" + this->user + " password= " + this->pass;
+	string connection_string = "host=" + this->host + " port=" + this->port + " dbname=" + this->db + " user=" + this->user + " password= " + this->pass;
 	// Create connection
 	this->conn = PQconnectdb(connection_string.c_str());
 	if (PQstatus(conn) != CONNECTION_OK)
@@ -59,7 +60,7 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 	for(double element : values){
 		oss << to_string(element) << ",";
 	}
-	oss << this->participant_id << "," << this->timestamp;
+	oss << message["data"]["participant_id"]  << "," << message["data"]["tmeta"]["time"];
 	string value_string = oss.str();
 
 	// Generate sql query
@@ -69,7 +70,7 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 					     value_string +
 					     ")";
 
-	std::cout << query << std::endl;
+	boost::replace_all(query, "\"", "\'");
 	// Send query
 	PGresult *result = PQexec(this->conn, query.c_str());
 	

@@ -22,7 +22,8 @@ class DBWrapper {
 
 		std::string user = "postgres";
 		std::string pass = "docker";
-		std::string host = "features-db";
-		std::string port = "63332";
+		std::string db = "features";
+		std::string host = "features_db";
+		std::string port = "5432";
 		PGconn *conn;
 };

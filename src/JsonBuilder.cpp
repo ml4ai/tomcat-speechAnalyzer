@@ -56,7 +56,7 @@ JsonBuilder::JsonBuilder() {
         boost::posix_time::microsec_clock::universal_time();
 
    // Initialize postgres connection
-//   this->postgres.initialize();
+   this->postgres.initialize();
    this->postgres.participant_id = this->participant_id;
 }
 
@@ -75,8 +75,9 @@ void JsonBuilder::process_message(string message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-            this->opensmile_history.push_back(this->opensmile_message);
+            //this->opensmile_history.push_back(this->opensmile_message);
 	    this->postgres.publish_chunk(this->opensmile_message);
+	    this->opensmile_message["data"]["participant_id"] = this->participant_id;
             this->opensmile_message["header"] =
                 create_common_header("observation");
             this->opensmile_message["msg"] = create_common_msg("openSMILE");
