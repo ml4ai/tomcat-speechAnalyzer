@@ -3,6 +3,9 @@
 #include <iostream>
 #include <sstream>
 #include <iterator>
+#include <map>
+#include <stdlib.h>
+
 
 #include <boost/algorithm/string.hpp>
 #include <libpq-fe.h>
@@ -76,10 +79,45 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 	
 }
 
+vector<nlohmann::json> DBWrapper::features_between(double start_time, double end_time){
+	// Get features from database
+	std::string query = "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) + " and timestamp <= " + to_string(end_time);
+	PGresult *result = PQexec(this->conn, query.c_str());
+
+	// Turn features into json object
+	vector<nlohmann::json> out; 
+	for( int i=0; i<PQntuples(result); i++){
+		nlohmann::json message;
+		for(int j=0; j<PQnfields(result); j++){
+			string field = this->column_map[PQfname(result, j)];
+			if(field.compare("timestamp") == 0 || field.compare("participant") == 0){
+				continue;
+			}
+			double value = atof(PQgetvalue(result, i, j));
+			message[field] = value;		
+		}
+		out.push_back(message);
+	}
+
+	// Clear result
+	PQclear(result);
+
+	return out;	
+}
+
 string DBWrapper::format_to_db_string(std::string in){
+	// Check if value already in map
+	if(this->column_map.find(in) != this->column_map.end()){
+		return this->column_map[in];	
+	}
+	
+	string original = string(in);
 	boost::replace_all(in, ")", "");
 	for(char c : this->INVALID_COLUMN_CHARACTERS){
 		boost::replace_all(in, string(1,c), "_");
 	}
+	this->column_map[in] = original;
+	this->column_map[original] = in;
+
 	return in;
 }

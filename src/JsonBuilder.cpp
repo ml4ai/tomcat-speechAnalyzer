@@ -75,7 +75,6 @@ void JsonBuilder::process_message(string message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-            //this->opensmile_history.push_back(this->opensmile_message);
 	    this->postgres.publish_chunk(this->opensmile_message);
 	    this->opensmile_message["data"]["participant_id"] = this->participant_id;
             this->opensmile_message["header"] =
@@ -164,10 +163,11 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     }
     // Publish message
     if (message["data"]["is_final"]) {
-	/*
+	
 	// Handle sentiment data 
         string features = this->process_alignment_message(response, id);
-        string mmc = this->process_mmc_message(features);
+	std::cout << features << std::endl;
+	/*string mmc = this->process_mmc_message(features);
         message["data"]["sentiment"] = nlohmann::json::parse(mmc);
 
 	// Handle features data
@@ -283,7 +283,8 @@ string JsonBuilder::process_alignment_message(StreamingRecognizeResponse respons
             string current_word = word.word();
             // Get extracted features message history
             vector<nlohmann::json> history =
-                this->features_between(start_time, end_time);
+                this->postgres.features_between(start_time, end_time);
+		//this->features_between(start_time, end_time);
             // Initialize the features output by creating a vector for each
             // feature
             nlohmann::json features_output;
@@ -473,6 +474,7 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
         float time = opensmile_history[i]["data"]["tmeta"]["time"];
         if (time > start_time && time < end_time) {
             out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
+	    std::cout << opensmile_history[i]["data"]["features"]["lld"].dump() << std::endl;
         }
     }
     this->opensmile_history.clear();
