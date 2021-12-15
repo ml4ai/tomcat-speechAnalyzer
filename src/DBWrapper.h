@@ -21,11 +21,11 @@ class DBWrapper {
 		static const std::vector<char> INVALID_COLUMN_CHARACTERS;
 		std::map<std::string, std::string> column_map;
 		std::string format_to_db_string(std::string in);
-
+	
+		std::string connection_string;
 		std::string user = "postgres";
 		std::string pass = "docker";
 		std::string db = "features";
 		std::string host = "features_db";
 		std::string port = "5432";
-		PGconn *conn;
 };

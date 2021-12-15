@@ -26,19 +26,22 @@ DBWrapper::~DBWrapper(){
 
 void DBWrapper::initialize(){
 	// Create connection string
-	string connection_string = "host=" + this->host + " port=" + this->port + " dbname=" + this->db + " user=" + this->user + " password= " + this->pass;
-	// Create connection
-	this->conn = PQconnectdb(connection_string.c_str());
-	if (PQstatus(conn) != CONNECTION_OK)
-        {
-		std::cout<< PQerrorMessage(conn) << std::endl;
-        }
+	this->connection_string = "host=" + this->host + " port=" + this->port + " dbname=" + this->db + " user=" + this->user + " password= " + this->pass;
 }
 void DBWrapper::shutdown(){
-	// End connection
-	PQfinish(this->conn);
 }
-void DBWrapper::publish_chunk(nlohmann::json message){
+void DBWrapper::publish_chunk(nlohmann::json message){	
+	PGconn *conn;
+	PGresult *result;
+	
+	// Create connection
+	conn = PQconnectdb(this->connection_string.c_str());
+	if (PQstatus(conn) != CONNECTION_OK)
+        {
+		std::cout << "Connection error: " << std::endl;
+		std::cout<< PQerrorMessage(conn) << std::endl;
+        }
+	
 	// Generate columns and values
 	vector<string> columns;
 	vector<double> values;
@@ -75,33 +78,59 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 
 	boost::replace_all(query, "\"", "\'");
 	// Send query
-	PGresult *result = PQexec(this->conn, query.c_str());
+	result = PQexec(conn, query.c_str());
+	if(result == NULL){
+		std::cout << "Execution error: " << std::endl;
+		std::cout << PQerrorMessage(conn) << std::endl;
+	}
+	// Clear result
+        PQclear(result);
 	
+	// End connection
+	PQfinish(conn);
 }
 
 vector<nlohmann::json> DBWrapper::features_between(double start_time, double end_time){
+	PGconn *conn;
+	PGresult *result;
+	 
+	 // Create connection
+        conn = PQconnectdb(this->connection_string.c_str());
+        if (PQstatus(conn) != CONNECTION_OK)
+        {
+                  std::cout << "Connection error: " << std::endl;
+                  std::cout<< PQerrorMessage(conn) << std::endl;
+        }
+
 	// Get features from database
 	std::string query = "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) + " and timestamp <= " + to_string(end_time);
-	PGresult *result = PQexec(this->conn, query.c_str());
-
+	result = PQexec(conn, query.c_str());
+	if(result == NULL){
+	     std::cout << "FAILURE" << std::endl;
+             std::cout << PQerrorMessage( conn) << std::endl;
+	}
 	// Turn features into json object
 	vector<nlohmann::json> out; 
 	for( int i=0; i<PQntuples(result); i++){
 		nlohmann::json message;
 		for(int j=0; j<PQnfields(result); j++){
-			string field = this->column_map[PQfname(result, j)];
-			if(field.compare("timestamp") == 0 || field.compare("participant") == 0){
+			if(this->column_map.find(PQfname(result, j)) == this->column_map.end()){
 				continue;
 			}
+			string field = this->column_map[PQfname(result, j)];
 			double value = atof(PQgetvalue(result, i, j));
 			message[field] = value;		
 		}
+		std::cout << message.dump() << std::endl;
 		out.push_back(message);
 	}
 
 	// Clear result
-	PQclear(result);
-
+        PQclear(result);
+	
+	// End connection
+	PQfinish(conn);
+	
 	return out;	
 }
 
@@ -112,6 +141,7 @@ string DBWrapper::format_to_db_string(std::string in){
 	}
 	
 	string original = string(in);
+	boost::to_lower(in);
 	boost::replace_all(in, ")", "");
 	for(char c : this->INVALID_COLUMN_CHARACTERS){
 		boost::replace_all(in, string(1,c), "_");
