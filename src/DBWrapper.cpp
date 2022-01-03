@@ -8,6 +8,10 @@
 
 
 #include <boost/algorithm/string.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
 #include <libpq-fe.h>
 #include <nlohmann/json.hpp>
 
@@ -25,6 +29,9 @@ DBWrapper::~DBWrapper(){
 }
 
 void DBWrapper::initialize(){
+	// Create UUID for client
+	this->client_id = boost::uuids::to_string(boost::uuids::random_generator()());
+
 	// Create connection string
 	this->connection_string = "host=" + this->host + " port=" + this->port + " dbname=" + this->db + " user=" + this->user + " password= " + this->pass;
 }
@@ -58,7 +65,7 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 	for(string element : columns){
 		oss << element << ",";
 	}
-	oss << "participant, " << "timestamp";
+	oss << "participant, " << "timestamp, " << "client_id";
 	string column_string = oss.str();
 	oss.str("");
 
@@ -66,7 +73,7 @@ void DBWrapper::publish_chunk(nlohmann::json message){
 	for(double element : values){
 		oss << to_string(element) << ",";
 	}
-	oss << message["data"]["participant_id"]  << "," << message["data"]["tmeta"]["time"];
+	oss << message["data"]["participant_id"]  << "," << message["data"]["tmeta"]["time"] << "," << "\'" << this->client_id << "\'";
 	string value_string = oss.str();
 
 	// Generate sql query
@@ -103,7 +110,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time, double end
         }
 
 	// Get features from database
-	std::string query = "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) + " and timestamp <= " + to_string(end_time);
+	std::string query = "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) + " and timestamp <= " + to_string(end_time) + " and client_id=" + this->client_id;
 	result = PQexec(conn, query.c_str());
 	if(result == NULL){
 	     std::cout << "FAILURE" << std::endl;
@@ -121,7 +128,6 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time, double end
 			double value = atof(PQgetvalue(result, i, j));
 			message[field] = value;		
 		}
-		std::cout << message.dump() << std::endl;
 		out.push_back(message);
 	}
 

@@ -22,6 +22,8 @@ class DBWrapper {
 		std::map<std::string, std::string> column_map;
 		std::string format_to_db_string(std::string in);
 	
+		std::string client_id;
+
 		std::string connection_string;
 		std::string user = "postgres";
 		std::string pass = "docker";
