@@ -110,7 +110,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time, double end
         }
 
 	// Get features from database
-	std::string query = "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) + " and timestamp <= " + to_string(end_time) + " and client_id=" + this->client_id;
+	std::string query = "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) + " and timestamp <= " + to_string(end_time) + " and client_id=" + "\'" + this->client_id + "\'";
 	result = PQexec(conn, query.c_str());
 	if(result == NULL){
 	     std::cout << "FAILURE" << std::endl;
