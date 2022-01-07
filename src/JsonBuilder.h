@@ -10,8 +10,8 @@
 #include <thread>
 #include <vector>
 
-#include "arguments.h"
 #include "DBWrapper.h"
+#include "arguments.h"
 
 class JsonBuilder {
   public:
@@ -32,14 +32,14 @@ class JsonBuilder {
         std::string id);
 
     // Process an asr message from vosk
-    void process_asr_message_vosk(
-        std::string response);
-     
+    void process_asr_message_vosk(std::string response);
+
     // Process a word/feature alignment message
     std::string process_alignment_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
-    std::string process_alignment_message_vosk(nlohmann::json response, std::string id);
+    std::string process_alignment_message_vosk(nlohmann::json response,
+                                               std::string id);
     std::string process_mmc_message(std::string message);
 
     // Process a audio chunk message
