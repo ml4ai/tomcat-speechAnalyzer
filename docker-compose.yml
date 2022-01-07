@@ -16,7 +16,7 @@ services:
       asist_net:
         aliases:
           - speech_analyzer_agent
-    entrypoint: ./speechAnalyzer --mode websocket --disable_opensmile false --disable_asr_google true
+    entrypoint: ./speechAnalyzer --mode websocket --disable_opensmile false --disable_asr_google true --disable_asr_vosk false
   vosk:
     image: alphacep/kaldi-en:latest
     container_name: vosk
@@ -35,6 +35,27 @@ services:
           - mmc
     entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
 
+  db:
+    image: features_database:latest
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: docker
+    ports:
+      - 63332:5432
+    networks:
+      asist_net:
+        aliases:
+          - features_db
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 63333:8080
+    networks:
+      asist_net:
+        aliases:
+          - features_adminer
   heartbeat:
     image: heartbeat:latest
     container_name: heartbeat

@@ -17,7 +17,6 @@
 
 #include "OpensmileSession.h"
 OpensmileSession::OpensmileSession(int socket_port, JsonBuilder* builder) {
-    std::cout << socket_port << std::endl;
     if (!fork()) {
         this->mode = 1;
         this->server = new OpensmileServer(socket_port);
@@ -157,5 +156,6 @@ OpensmileServer::OpensmileServer(int socket_port) {
 
     close(this->new_socket);
     smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
+    smile_free(this->handle);
     exit(0);
 }
