@@ -6,6 +6,7 @@
 #include <smileapi/SMILEapi.h>
 #include <string>
 #include <thread>
+#include <mutex>
 #include <vector>
 
 // Boost
@@ -76,7 +77,8 @@ void write_thread(
 Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
 int WebsocketSession::socket_port;
-
+std::vector<std::string> WebsocketSession::current_sessions;
+std::mutex *WebsocketSession::session_mutex;
 int main(int argc, char* argv[]) {
 
     // Enable Boost logging
@@ -136,10 +138,12 @@ int main(int argc, char* argv[]) {
         cout << "Error parsing arguments" << endl;
         return -1;
     }
+
     JsonBuilder::args = args;
     WebsocketSession::args = args;
     WebsocketSession::socket_port = 15556;
-
+    WebsocketSession::current_sessions = std::vector<std::string>();
+    WebsocketSession::session_mutex = new std::mutex();
     // Setup Global Listener
     GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
     GLOBAL_LISTENER.subscribe("trial");
