@@ -261,9 +261,10 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
         }
     }
     catch (std::exception const& e) {
-        std::cout << e.what() << std::endl;
-        std::cout << "Invalid Vosk message: " << std::endl;
-        std::cout << response << std::endl;
+        std::cout << "Error processing Vosk message" << std::endl;
+        std::cout << "Error was: " << e.what() << std::endl;
+	std::cout << "Message was:" << std::endl;
+	std::cout << response << std::endl;
     }
 }
 
@@ -354,11 +355,13 @@ string JsonBuilder::process_alignment_message_vosk(nlohmann::json response,
             vector<nlohmann::json> history =
                 this->postgres.features_between(start_time, end_time);
             // Initialize the features output by creating a vector for each
-            // feature
+            // feature 
+	    nlohmann::json word_message;
             nlohmann::json features_output;
             if (history.size() == 0) {
                 features_output = nullptr;
-            }
+            	word_message["features"] = nullptr;
+	    }
             else {
                 for (auto& it : history[0].items()) {
                     features_output[it.key()] = vector<double>();
@@ -369,12 +372,11 @@ string JsonBuilder::process_alignment_message_vosk(nlohmann::json response,
                         features_output[it.key()].push_back(entry[it.key()]);
                     }
                 }
+            	word_message["features"] = features_output.dump();
             }
-            nlohmann::json word_message;
             word_message["word"] = current_word;
             word_message["start_time"] = start_time;
             word_message["end_time"] = end_time;
-            word_message["features"] = features_output.dump();
             word_messages.push_back(word_message);
         }
     }
