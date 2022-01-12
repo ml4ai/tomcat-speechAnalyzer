@@ -2,6 +2,9 @@
 #include <iostream>
 #include <string>
 
+#include <sys/types.h>
+#include <unistd.h>
+
 #include "JsonBuilder.h"
 #include <nlohmann/json.hpp>
 
@@ -30,6 +33,7 @@ void SpeechWrapperVosk::start_stream() {
     this->initialize_stream();
     this->send_config();
 }
+
 void SpeechWrapperVosk::end_stream() {
     // Stop read thread
     this->running = false;
@@ -37,6 +41,7 @@ void SpeechWrapperVosk::end_stream() {
 
     // Close websocket
     this->ws->close(websocket::close_code::normal);
+
 }
 void SpeechWrapperVosk::initialize_stream() {
     // These objects perform our I/O
@@ -70,9 +75,11 @@ void SpeechWrapperVosk::initialize_stream() {
                 this->builder->process_asr_message_vosk(response);
             }
             catch (std::exception const& e) {
-                std::cout << "Vosk container failure" << std::endl;
-                this->running = false;
-            }
+                std::cout << "Error recieving result from vosk server" << std::endl;
+		std::cout << "Error was: " << e.what() << std::endl;
+
+		this->running = false;
+	    }
         }
     });
 }
