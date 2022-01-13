@@ -242,8 +242,9 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
             // Handle features data
             nlohmann::json temp = nlohmann::json::parse(features)["data"];
             for (int i = 0; i < temp["word_messages"].size(); i++) {
-                string f = temp["word_messages"][i]["features"];
-                temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
+               temp["word_messages"][i].erase("features"); 
+		//string f = temp["word_messages"][i]["features"];
+                //temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
             }
             message["data"]["features"] = temp;
         }
@@ -521,7 +522,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "3.2.0";
+    message["version"] = "3.3.1";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
