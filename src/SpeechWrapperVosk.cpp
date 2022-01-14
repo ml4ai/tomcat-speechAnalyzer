@@ -77,8 +77,8 @@ void SpeechWrapperVosk::initialize_stream() {
                 std::cout << "Error recieving result from vosk server"
                           << std::endl;
                 std::cout << "Error was: " << e.what() << std::endl;
-
-                this->running = false;
+                
+		this->running = false;
             }
         }
     });
