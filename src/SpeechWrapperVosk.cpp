@@ -41,7 +41,6 @@ void SpeechWrapperVosk::end_stream() {
 
     // Close websocket
     this->ws->close(websocket::close_code::normal);
-
 }
 void SpeechWrapperVosk::initialize_stream() {
     // These objects perform our I/O
@@ -75,11 +74,12 @@ void SpeechWrapperVosk::initialize_stream() {
                 this->builder->process_asr_message_vosk(response);
             }
             catch (std::exception const& e) {
-                std::cout << "Error recieving result from vosk server" << std::endl;
-		std::cout << "Error was: " << e.what() << std::endl;
+                std::cout << "Error recieving result from vosk server"
+                          << std::endl;
+                std::cout << "Error was: " << e.what() << std::endl;
 
-		this->running = false;
-	    }
+                this->running = false;
+            }
         }
     });
 }

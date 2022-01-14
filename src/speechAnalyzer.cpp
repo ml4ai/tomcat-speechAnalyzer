@@ -3,10 +3,10 @@
 #include <cstring> //strerror
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <smileapi/SMILEapi.h>
 #include <string>
 #include <thread>
-#include <mutex>
 #include <vector>
 
 // Boost
@@ -78,7 +78,7 @@ Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
 int WebsocketSession::socket_port;
 std::vector<std::string> WebsocketSession::current_sessions;
-std::mutex *WebsocketSession::session_mutex;
+std::mutex* WebsocketSession::session_mutex;
 int main(int argc, char* argv[]) {
 
     // Enable Boost logging
