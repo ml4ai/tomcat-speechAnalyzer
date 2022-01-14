@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <stdio.h>
 #include <thread>
 
@@ -74,6 +75,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     // socket port
     static int socket_port;
 
+    // Static current sessions
+    static std::vector<std::string> current_sessions;
+    static std::mutex* session_mutex;
+
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
 
@@ -96,6 +101,17 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
+
+        // Check if session already exists
+        if (std::find(this->current_sessions.begin(),
+                      this->current_sessions.end(),
+                      this->participant_id) != this->current_sessions.end()) {
+            std::cout << "Session already exists" << std::endl;
+            return;
+        }
+        else {
+            this->current_sessions.push_back(this->participant_id);
+        }
 
         this->builder.participant_id = params["id"];
 
@@ -261,6 +277,13 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         if (ec) {
             BOOST_LOG_TRIVIAL(info) << "Connection has been closed";
             this->read_done = true;
+            this->session_mutex->lock();
+            this->current_sessions.erase(
+                std::remove(this->current_sessions.begin(),
+                            this->current_sessions.end(),
+                            this->participant_id),
+                this->current_sessions.end());
+            this->session_mutex->unlock();
         }
 
         if (bytes_transferred != 0) {
