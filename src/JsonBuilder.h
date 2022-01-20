@@ -55,6 +55,10 @@ class JsonBuilder {
     boost::posix_time::ptime stream_start_time;
     boost::posix_time::ptime stream_start_time_vosk;
 
+    // Bool object for determining start of utterance
+    bool is_initial = false;
+    std::string utterance_start_timestamp;
+
     // Mosquitto client objects
     Mosquitto mosquitto_client;
     TrialListener listener_client;

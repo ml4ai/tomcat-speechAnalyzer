@@ -202,7 +202,28 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
             // Handle intermediate transcription
             message["data"]["is_final"] = false;
             message["data"]["text"] = response_message["partial"];
-        }
+
+	    // Don't publish dead air messages
+	    string text = message["data"]["text"];
+	    if(text.compare("the") == 0){
+		return;
+	    }
+
+	    // Handle is_initial field
+	    if(this->is_initial){
+		message["data"]["is_initial"] = true;
+		this->utterance_start_timestamp = boost::posix_time::to_iso_extended_string(
+              boost::posix_time::microsec_clock::universal_time()) +
+          "Z";
+		this->is_initial = false;
+	    }
+	    else{
+		message["data"]["is_initial"] = false;
+	    }
+
+	    // Add start timestamp
+	    message["data"]["start_timestamp"] = this->utterance_start_timestamp;
+	}
         else if (response_message.contains("alternatives")) {
             vector<nlohmann::json> alternatives =
                 response_message["alternatives"];
@@ -253,6 +274,8 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
         // Publish message
         if (message["data"]["is_final"]) {
             this->mosquitto_client.publish("agent/asr/final", message.dump());
+	    // Set is_initial to true
+	    this->is_initial = true;
         }
         else {
             this->mosquitto_client.publish("agent/asr/intermediate",
