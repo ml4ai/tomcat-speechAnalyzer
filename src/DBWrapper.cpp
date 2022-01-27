@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <queue>
+#include <mutex>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -27,27 +29,58 @@ DBWrapper::DBWrapper() {}
 DBWrapper::~DBWrapper() {}
 
 void DBWrapper::initialize() {
-    // Create UUID for client
-    this->client_id =
-        boost::uuids::to_string(boost::uuids::random_generator()());
+    this->running = true;
 
     // Create connection string
     this->connection_string = "host=" + this->host + " port=" + this->port +
                               " dbname=" + this->db + " user=" + this->user +
                               " password= " + this->pass;
+
+    // Create connection objects
+    for(int i=0;i<this->thread_pool_size;i++){
+	this->connection_pool.push_back(PQconnectdb(this->connection_string.c_str()));
+   }
+
+   // Initialize publishing thread
+   this->publishing_thread = std::thread{ [this]{this->loop();}};
 }
-void DBWrapper::shutdown() {}
-void DBWrapper::publish_chunk(nlohmann::json message) {
+void DBWrapper::shutdown() {
+    this->running = false;
+    this->publishing_thread.join();
+
+    for(int i=0;i<this->thread_pool_size;i++){
+	PQfinish(this->connection_pool[i]);	
+    }
+
+}
+
+PGconn* DBWrapper::get_connection(){
+	return this->connection_pool[rand()%10];
+}
+
+void DBWrapper::loop(){
+	while(this->running){
+		while(!this->publishing_queue.empty()){
+			nlohmann::json message = this->publishing_queue.front();
+			this->publishing_queue.pop();
+
+			this->publish_chunk_private(message);
+		}	
+	}
+}
+
+void DBWrapper::publish_chunk(nlohmann::json message){
+	this->publishing_mutex.lock();
+	this->publishing_queue.push(message);
+	this->publishing_mutex.unlock();
+}
+
+void DBWrapper::publish_chunk_private(nlohmann::json message) {
     PGconn* conn;
     PGresult* result;
 
-    // Create connection
-    conn = PQconnectdb(this->connection_string.c_str());
-    if (PQstatus(conn) != CONNECTION_OK) {
-        std::cout << "Connection error: " << std::endl;
-        std::cout << PQerrorMessage(conn) << std::endl;
-    }
-
+    conn = this->get_connection();
+    
     // Generate columns and values
     vector<string> columns;
     vector<double> values;
@@ -59,6 +92,11 @@ void DBWrapper::publish_chunk(nlohmann::json message) {
     // Get timestamp
     this->timestamp = message["data"]["tmeta"]["time"];
 
+    // Create client_id
+    this->participant_id = to_string(message["data"]["participant_id"]);
+    boost::replace_all(this->participant_id, "\"", "\'");
+    this->trial_id = to_string(message["msg"]["trial_id"]);
+    boost::replace_all(this->trial_id, "\"", "\'");
     // Convert columns to string format
     ostringstream oss;
     for (string element : columns) {
@@ -76,7 +114,7 @@ void DBWrapper::publish_chunk(nlohmann::json message) {
     }
     oss << message["data"]["participant_id"] << ","
         << message["data"]["tmeta"]["time"] << ","
-        << "\'" << this->client_id << "\'";
+        << message["msg"]["trial_id"];
     string value_string = oss.str();
 
     // Generate sql query
@@ -93,8 +131,6 @@ void DBWrapper::publish_chunk(nlohmann::json message) {
     // Clear result
     PQclear(result);
 
-    // End connection
-    PQfinish(conn);
 }
 
 vector<nlohmann::json> DBWrapper::features_between(double start_time,
@@ -112,8 +148,11 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     // Get features from database
     std::string query =
         "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) +
-        " and timestamp <= " + to_string(end_time) + " and client_id=" + "\'" +
-        this->client_id + "\'";
+        " and timestamp <= " + to_string(end_time) +  " and participant=" + this->participant_id; //+ 
+//	" and client_id=" + this->trial_id;
+	//to_string(end_time) + " and client_id=" + 
+        //this->trial_id + " and participant=" +
+	//this->participant_id;
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
         std::cout << "FAILURE" << std::endl;
@@ -137,10 +176,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
 
     // Clear result
     PQclear(result);
-
-    // End connection
     PQfinish(conn);
-
     return out;
 }
 
