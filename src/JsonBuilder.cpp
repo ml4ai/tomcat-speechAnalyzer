@@ -57,6 +57,7 @@ JsonBuilder::JsonBuilder() {
 
     // Initialize postgres connection
     this->postgres.initialize();
+    this->postgres.trial_id = GLOBAL_LISTENER.trial_id;
     this->postgres.participant_id = this->participant_id;
 }
 
@@ -75,8 +76,8 @@ void JsonBuilder::process_message(string message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-            this->postgres.publish_chunk(this->opensmile_message);
-            this->opensmile_message["data"]["participant_id"] =
+	    this->postgres.publish_chunk(this->opensmile_message);
+	    this->opensmile_message["data"]["participant_id"] =
                 this->participant_id;
             this->opensmile_message["header"] =
                 create_common_header("observation");
@@ -117,6 +118,7 @@ void JsonBuilder::process_message(string message) {
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
+    try{
     nlohmann::json message;
     message["header"] = create_common_header("observation");
     message["msg"] = create_common_msg("asr:transcription");
@@ -169,21 +171,25 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
         string features = this->process_alignment_message(response, id);
         string mmc = this->process_mmc_message(features);
         message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-
-        // Handle features data
+	
+	// Handle features data
         nlohmann::json temp = nlohmann::json::parse(features)["data"];
         for (int i = 0; i < temp["word_messages"].size(); i++) {
-            string f = temp["word_messages"][i]["features"];
-            temp["word_messages"][i]["features"] = nlohmann::json::parse(f);
+          temp["word_messages"][i].erase("features");
         }
         message["data"]["features"] = temp;
-
-        this->mosquitto_client.publish("agent/asr/final", message.dump());
+        
+	this->mosquitto_client.publish("agent/asr/final", message.dump());
     }
     else {
         this->mosquitto_client.publish("agent/asr/intermediate",
                                        message.dump());
     }
+    }
+    catch (std::exception const& e) {
+          std::cout << "Error processing Google message" << std::endl;
+          std::cout << "Error was: " << e.what() << std::endl;
+      }
 }
 
 // Data for handling vosk asr messages
@@ -317,13 +323,14 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                 this->sync_time + end_seconds + (end_nanos / 1000000000.0);
             string current_word = word.word();
             // Get extracted features message history
-            vector<nlohmann::json> history =
-                this->postgres.features_between(start_time, end_time);
+            vector<nlohmann::json> history = this->postgres.features_between(start_time, end_time);
             // Initialize the features output by creating a vector for each
             // feature
+            nlohmann::json word_message;
             nlohmann::json features_output;
             if (history.size() == 0) {
                 features_output = nullptr;
+                word_message["features"] = nullptr;
             }
             else {
                 for (auto& it : history[0].items()) {
@@ -335,8 +342,8 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                         features_output[it.key()].push_back(entry[it.key()]);
                     }
                 }
+		word_message["features"] = features_output.dump();
             }
-            nlohmann::json word_message;
             word_message["word"] = current_word;
             word_message["start_time"] = start_time;
             word_message["end_time"] = end_time;
@@ -543,7 +550,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "3.3.1";
+    message["version"] = "3.3.2";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
