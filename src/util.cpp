@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include <iostream>
+#include <thread>
 
 #include "GlobalMosquittoListener.h"
 #include "util.h"
@@ -54,6 +55,7 @@ void process_responses(
                                         // Generate UUID4 for messages
         string id = boost::uuids::to_string(boost::uuids::random_generator()());
         // Process messages
-        builder->process_asr_message(response, id);
+	thread{[=]{ builder->process_asr_message(response,id);} }.detach();
+        //builder->process_asr_message(response, id);
     }
 }
