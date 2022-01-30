@@ -24,6 +24,12 @@ find_package(nlohmann_json REQUIRED)
 find_package(SMILEapi REQUIRED)
 find_package(Mosquitto REQUIRED)
 find_package(range-v3 REQUIRED)
+
+# Add additional search paths to get things to work with MacPorts-provided
+# PostgreSQL
+set(PostgreSQL_INCLUDE_ADDITIONAL_SEARCH_SUFFIXES "postgresql14")
+set(PostgreSQL_LIBRARY_ADDITIONAL_SEARCH_SUFFIXES "postgresql14")
+
 find_package(PostgreSQL REQUIRED)
 
 option(BUILD_GOOGLE_CLOUD_SPEECH_LIB "Build google_cloud_speech library" ON)
