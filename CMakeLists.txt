@@ -23,7 +23,6 @@ find_package(
 find_package(nlohmann_json REQUIRED)
 find_package(SMILEapi REQUIRED)
 find_package(Mosquitto REQUIRED)
-find_package(range-v3 REQUIRED)
 
 # Add additional search paths to get things to work with MacPorts-provided
 # PostgreSQL

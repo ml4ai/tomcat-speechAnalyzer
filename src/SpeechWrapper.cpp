@@ -7,6 +7,7 @@ using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
+using google::cloud::speech::v1::StreamingRecognitionConfig;
 
 using namespace std;
 
@@ -62,9 +63,9 @@ void SpeechWrapper::initialize_stream() {
 void SpeechWrapper::send_config() {
     // Write first request with config
     StreamingRecognizeRequest config_request;
-    auto* streaming_config = config_request.mutable_streaming_config();
+    StreamingRecognitionConfig* streaming_config = config_request.mutable_streaming_config();
 
-    auto mutable_config = streaming_config->mutable_config();
+    RecognitionConfig* mutable_config = streaming_config->mutable_config();
     mutable_config->set_language_code("en");
     mutable_config->set_sample_rate_hertz(this->sample_rate);
     mutable_config->set_encoding(RecognitionConfig::LINEAR16);
