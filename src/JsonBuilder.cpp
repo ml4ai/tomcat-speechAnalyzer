@@ -169,20 +169,14 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 		message["data"]["end_timestamp"] =
 		    boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
 	    
-	    
 		// Add sentiment data
 		string features = this->process_alignment_message(response, id);
 		string mmc = this->process_mmc_message(features);
 		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+	        this->strip_mmc_message(message);
+	        message["data"]["features"] = nlohmann::json::parse(features)["data"];
+	        this->strip_features_message(message);
 	    
-	    
-		// Add features data
-		nlohmann::json temp = nlohmann::json::parse(features)["data"];
-		for (int i = 0; i < temp["word_messages"].size(); i++) {
-		  temp["word_messages"][i].erase("features");
-		}
-		message["data"]["features"] = temp;
-
 		// Publish message
 		this->mosquitto_client.publish("agent/asr/final", message.dump());
 		
@@ -272,14 +266,10 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
                 response_message, message["data"]["id"]);
             string mmc = this->process_mmc_message(features);
             message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+	    this->strip_mmc_message(message);
+	    message["data"]["features"] = nlohmann::json::parse(features)["data"];
+	    this->strip_features_message(message);
 
-            // Handle features data
-            nlohmann::json temp = nlohmann::json::parse(features)["data"];
-            for (int i = 0; i < temp["word_messages"].size(); i++) {
-                temp["word_messages"][i].erase("features");
-            }
-            message["data"]["features"] = temp;
-            
 	    // Publish message
 	    this->mosquitto_client.publish("agent/asr/final", message.dump());
 	    // Set is_initial to true
@@ -557,3 +547,27 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
 
     return message;
 }
+
+void JsonBuilder::strip_mmc_message(nlohmann::json& message){
+	
+	// Remove buggy speaker field
+	message["data"]["sentiment"].erase("speaker");
+	
+}
+
+
+void JsonBuilder::strip_features_message(nlohmann::json& message){
+	
+	// Remove utterance id
+	message["data"]["features"].erase("utterance_id");
+
+	// Remove features text
+	message["data"]["features"].erase("text");
+
+	// Remove vocalic features
+      for (int i = 0; i < message["data"]["features"]["word_messages"].size(); i++) {
+	  message["data"]["features"]["word_messages"][i].erase("features");
+      }
+      
+}
+

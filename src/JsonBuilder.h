@@ -41,6 +41,8 @@ class JsonBuilder {
     std::string process_alignment_message_vosk(nlohmann::json response,
                                                std::string id);
     std::string process_mmc_message(std::string message);
+    void strip_mmc_message(nlohmann::json& message);
+    void strip_features_message(nlohmann::json& message);
 
     // Process a audio chunk message
     void process_audio_chunk_message(std::vector<char> chunk, std::string id);
