@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
@@ -31,4 +32,7 @@ class SpeechWrapper {
 
     void initialize_stream();
     void send_config();
+
+    void load_speech_context();
+    std::vector<std::string> speech_context;
 };
