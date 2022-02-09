@@ -143,6 +143,11 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 		    else{
 			message["data"]["is_initial"] = false;
 		    }
+		
+		 // Add start timestamp
+            	message["data"]["start_timestamp"] = this->utterance_start_timestamp;
+		
+		// Publish message
 		this->mosquitto_client.publish("agent/asr/intermediate",
 					       message.dump());
 	    }
