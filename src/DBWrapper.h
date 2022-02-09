@@ -20,7 +20,10 @@ class DBWrapper {
                                                  double end_time);
 
     std::string participant_id;
+    bool participant_id_set = false;
     std::string trial_id;
+    bool trial_id_set = false;
+    std::string experiment_id;
     double timestamp;
 
   private:
@@ -37,14 +40,13 @@ class DBWrapper {
     std::string host = "features_db";
     std::string port = "5432";
 
-    int thread_pool_size=20;
+    int thread_pool_size=1;
+    std::vector<std::thread> thread_pool;
     std::vector<PGconn*> connection_pool;
+    std::vector<std::queue<nlohmann::json>> queue_pool;
 
     bool running = false;
-    std::thread publishing_thread;
-    std::queue<nlohmann::json> publishing_queue;
-    std::mutex publishing_mutex;
  
-    void publish_chunk_private(nlohmann::json message);
-    void loop();
+    void publish_chunk_private(nlohmann::json message, int index);
+    void loop(int index);
 };
