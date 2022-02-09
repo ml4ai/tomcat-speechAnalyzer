@@ -131,6 +131,18 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 
 
 	    if(!message["data"]["is_final"]){
+		    
+		    // Handle is_initial field
+		    if(this->is_initial){
+			message["data"]["is_initial"] = true;
+			this->utterance_start_timestamp = boost::posix_time::to_iso_extended_string(
+		      boost::posix_time::microsec_clock::universal_time()) +
+		  "Z";
+			this->is_initial = false;
+		    }
+		    else{
+			message["data"]["is_initial"] = false;
+		    }
 		this->mosquitto_client.publish("agent/asr/intermediate",
 					       message.dump());
 	    }
