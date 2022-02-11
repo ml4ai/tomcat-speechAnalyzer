@@ -5,6 +5,9 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -20,7 +23,6 @@
 #include "SpeechWrapperVosk.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
-#include <range/v3/all.hpp>
 #include <smileapi/SMILEapi.h>
 
 #include "arguments.h"
@@ -85,18 +87,22 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     // Start the asynchronous accept operation
     template <class Body, class Allocator>
     void do_accept(http::request<Body, http::basic_fields<Allocator>> request) {
-        using ranges::to;
-        using ranges::views::split, ranges::views::drop;
+        using boost::split, boost::is_any_of, boost::erase_head;
 
         std::map<std::string, std::string> params;
 
-        auto param_strings = request.target() | drop(2) | split('&') |
-                             to<std::vector<std::string>>();
+
+        std::string request_target = std::string(request.target());
+            erase_head(request_target, 2);
+
+        std::vector<std::string> param_strings;
+        split(param_strings, request_target, is_any_of("&"));
+
 
         for (auto param_string : param_strings) {
-            auto key_value_pair =
-                param_string | split('=') | to<std::vector<std::string>>();
-            params[key_value_pair[0]] = key_value_pair[1];
+            std::vector<std::string> key_value_pair;
+            split(key_value_pair, param_string, is_any_of("="));
+            params[key_value_pair.at(0)] = key_value_pair.at(1);
         }
 
         this->participant_id = params["id"];
