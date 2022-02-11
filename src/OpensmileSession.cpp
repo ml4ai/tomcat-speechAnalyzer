@@ -66,7 +66,7 @@ void OpensmileClient::send_chunk(vector<float> float_chunk) {
 
 void OpensmileClient::send_eoi() {
     this->looping = false;
-    this->loop_thread.join();
+    //  this->loop_thread.join();
 
     close(this->sock);
 }

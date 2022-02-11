@@ -1,3 +1,6 @@
+#include <fstream>
+#include <string>
+
 #include "SpeechWrapper.h"
 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
@@ -61,6 +64,7 @@ void SpeechWrapper::initialize_stream() {
 }
 
 void SpeechWrapper::send_config() {
+
     // Write first request with config
     StreamingRecognizeRequest config_request;
     StreamingRecognitionConfig* streaming_config = config_request.mutable_streaming_config();
@@ -71,6 +75,8 @@ void SpeechWrapper::send_config() {
     mutable_config->set_encoding(RecognitionConfig::LINEAR16);
     mutable_config->set_max_alternatives(5);
     mutable_config->set_enable_word_time_offsets(true);
+
     streaming_config->set_interim_results(true);
     streamer->Write(config_request);
 }
+

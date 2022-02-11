@@ -41,6 +41,8 @@ class JsonBuilder {
     std::string process_alignment_message_vosk(nlohmann::json response,
                                                std::string id);
     std::string process_mmc_message(std::string message);
+    void strip_mmc_message(nlohmann::json& message);
+    void strip_features_message(nlohmann::json& message);
 
     // Process a audio chunk message
     void process_audio_chunk_message(std::vector<char> chunk, std::string id);
@@ -54,6 +56,10 @@ class JsonBuilder {
     // Time object for start of stream
     boost::posix_time::ptime stream_start_time;
     boost::posix_time::ptime stream_start_time_vosk;
+
+    // Bool object for determining start of utterance
+    bool is_initial = false;
+    std::string utterance_start_timestamp;
 
     // Mosquitto client objects
     Mosquitto mosquitto_client;

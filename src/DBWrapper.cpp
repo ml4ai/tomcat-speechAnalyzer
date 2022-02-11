@@ -1,12 +1,15 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <mutex>
+#include <queue>
 #include <sstream>
 #include <stdlib.h>
 #include <string>
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -27,26 +30,56 @@ DBWrapper::DBWrapper() {}
 DBWrapper::~DBWrapper() {}
 
 void DBWrapper::initialize() {
-    // Create UUID for client
-    this->client_id =
-        boost::uuids::to_string(boost::uuids::random_generator()());
+    this->running = true;
 
     // Create connection string
     this->connection_string = "host=" + this->host + " port=" + this->port +
                               " dbname=" + this->db + " user=" + this->user +
                               " password= " + this->pass;
+
+    for (int i = 0; i < this->thread_pool_size; i++) {
+        // Create connection objects
+        this->connection_pool.push_back(
+            PQconnectdb(this->connection_string.c_str()));
+        this->thread_pool.push_back(std::thread{[this, i] { this->loop(i); }});
+        this->queue_pool.push_back(std::queue<nlohmann::json>());
+    }
 }
-void DBWrapper::shutdown() {}
+void DBWrapper::shutdown() {
+    this->running = false;
+    for (int i = 0; i < this->thread_pool_size; i++) {
+        this->thread_pool[i].join();
+        PQfinish(this->connection_pool[i]);
+    }
+    std::cout << "Shutdown DB connections" << std::endl;
+}
+
+PGconn* DBWrapper::get_connection() {
+    return this->connection_pool[rand() % this->thread_pool_size];
+}
+
+void DBWrapper::loop(int index) {
+    while (this->running) {
+        if (!this->queue_pool[index].empty()) {
+            nlohmann::json message = this->queue_pool[index].front();
+            this->queue_pool[index].pop();
+            this->publish_chunk_private(message, index);
+        }
+        else {
+            continue;
+        }
+    }
+}
+
 void DBWrapper::publish_chunk(nlohmann::json message) {
+    this->queue_pool[rand() % this->thread_pool_size].push(message);
+}
+
+void DBWrapper::publish_chunk_private(nlohmann::json message, int index) {
     PGconn* conn;
     PGresult* result;
 
-    // Create connection
-    conn = PQconnectdb(this->connection_string.c_str());
-    if (PQstatus(conn) != CONNECTION_OK) {
-        std::cout << "Connection error: " << std::endl;
-        std::cout << PQerrorMessage(conn) << std::endl;
-    }
+    conn = this->connection_pool[index];
 
     // Generate columns and values
     vector<string> columns;
@@ -59,14 +92,23 @@ void DBWrapper::publish_chunk(nlohmann::json message) {
     // Get timestamp
     this->timestamp = message["data"]["tmeta"]["time"];
 
+    this->participant_id = to_string(message["data"]["participant_id"]);
+    boost::replace_all(this->participant_id, "\"", "\'");
+    this->trial_id = to_string(message["msg"]["trial_id"]);
+    boost::replace_all(this->trial_id, "\"", "\'");
+    this->experiment_id = to_string(message["msg"]["experiment_id"]);
+    boost::replace_all(this->experiment_id, "\"", "\'");
+
     // Convert columns to string format
     ostringstream oss;
     for (string element : columns) {
         oss << element << ",";
     }
-    oss << "participant, "
+    oss << "seconds_offset, "
         << "timestamp, "
-        << "client_id";
+        << "participant, "
+        << "trial_id, "
+        << "experiment_id";
     string column_string = oss.str();
     oss.str("");
 
@@ -74,9 +116,15 @@ void DBWrapper::publish_chunk(nlohmann::json message) {
     for (double element : values) {
         oss << to_string(element) << ",";
     }
-    oss << message["data"]["participant_id"] << ","
-        << message["data"]["tmeta"]["time"] << ","
-        << "\'" << this->client_id << "\'";
+    std::string utc_timestamp =
+        boost::posix_time::to_iso_extended_string(
+            boost::posix_time::microsec_clock::universal_time()) +
+        "Z";
+
+    oss << message["data"]["tmeta"]["time"] << ","
+        << "\'" << utc_timestamp << "\'"
+        << "," << message["data"]["participant_id"] << ","
+        << message["msg"]["trial_id"] << "," << message["msg"]["experiment_id"];
     string value_string = oss.str();
 
     // Generate sql query
@@ -92,9 +140,6 @@ void DBWrapper::publish_chunk(nlohmann::json message) {
     }
     // Clear result
     PQclear(result);
-
-    // End connection
-    PQfinish(conn);
 }
 
 vector<nlohmann::json> DBWrapper::features_between(double start_time,
@@ -110,10 +155,11 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     }
 
     // Get features from database
-    std::string query =
-        "SELECT * FROM features WHERE timestamp >= " + to_string(start_time) +
-        " and timestamp <= " + to_string(end_time) + " and client_id=" + "\'" +
-        this->client_id + "\'";
+    std::string query = "SELECT * FROM features WHERE seconds_offset >= " +
+                        to_string(start_time) +
+                        " and seconds_offset <= " + to_string(end_time) +
+                        " and participant=" + this->participant_id +
+                        " and trial_id=" + this->trial_id; //+
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
         std::cout << "FAILURE" << std::endl;
@@ -137,10 +183,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
 
     // Clear result
     PQclear(result);
-
-    // End connection
     PQfinish(conn);
-
     return out;
 }
 

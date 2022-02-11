@@ -44,7 +44,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     ws::stream<beast::tcp_stream> ws_;
     beast::flat_buffer buffer_;
     boost::lockfree::spsc_queue<std::vector<char>,
-                                boost::lockfree::capacity<1024>>
+                                boost::lockfree::capacity<8096>>
         spsc_queue;
 
     std::atomic<bool> done{false};
@@ -239,6 +239,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 }
             }
         }
+
         // Cleanup subsystems
         if (!this->args.disable_asr_google) {
             this->speech_handler->send_writes_done();
@@ -305,7 +306,12 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             delete[] arr;
 
             // Push the chunk to the queue for the write_thread
+            int count = 0;
             while (!this->spsc_queue.push(chunk)) {
+                count++;
+            }
+            if (count > 0) {
+                std::cout << count << std::endl;
             }
             // Send chunk for raw audio message
             string id = to_string(this->increment);
