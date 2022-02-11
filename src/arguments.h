@@ -20,6 +20,9 @@ struct Arguments {
     bool disable_asr_vosk;
     bool disable_opensmile;
     bool disable_audio_writing;
+   
+     // Publishing options
     bool disable_chunk_publishing;
     bool disable_chunk_metadata_publishing;
+    bool intermediate_first_only;
 };

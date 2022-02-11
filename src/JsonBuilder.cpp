@@ -141,6 +141,8 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 			this->is_initial = false;
 		    }
 		    else{
+			// Stop processing if only publishig first intermediate
+			return;
 			message["data"]["is_initial"] = false;
 		    }
 		
@@ -197,6 +199,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 		// Publish message
 		this->mosquitto_client.publish("agent/asr/final", message.dump());
 		
+		this->is_initial = true;	
 	    }
     }
     catch (std::exception const& e) {
