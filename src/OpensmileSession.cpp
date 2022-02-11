@@ -66,7 +66,7 @@ void OpensmileClient::send_chunk(vector<float> float_chunk) {
 
 void OpensmileClient::send_eoi() {
     this->looping = false;
-  //  this->loop_thread.join();
+    //  this->loop_thread.join();
 
     close(this->sock);
 }
@@ -79,7 +79,7 @@ void OpensmileClient::loop() {
         char c[num_bytes];
         recv(this->sock, &c, num_bytes, 0);
         string message(c);
-	this->builder->process_message(message);
+        this->builder->process_message(message);
     }
 }
 

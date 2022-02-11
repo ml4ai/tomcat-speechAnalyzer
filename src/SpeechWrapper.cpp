@@ -1,5 +1,5 @@
-#include <string>
 #include <fstream>
+#include <string>
 
 #include "SpeechWrapper.h"
 
@@ -76,21 +76,21 @@ void SpeechWrapper::send_config() {
     mutable_config->set_encoding(RecognitionConfig::LINEAR16);
     mutable_config->set_max_alternatives(5);
     mutable_config->set_enable_word_time_offsets(true);
-    
-    // Add speech context phrases 
+
+    // Add speech context phrases
     auto context = mutable_config->add_speech_contexts();
-    for(string phrase : this->speech_context){
-	context->add_phrases(phrase);
+    for (string phrase : this->speech_context) {
+        context->add_phrases(phrase);
     }
 
     streaming_config->set_interim_results(true);
     streamer->Write(config_request);
 }
 
-void SpeechWrapper::load_speech_context(){
-	ifstream file("speech_context.txt");
-	string line;
-	while(getline(file, line)){
-		this->speech_context.push_back(line);
-	}
+void SpeechWrapper::load_speech_context() {
+    ifstream file("speech_context.txt");
+    string line;
+    while (getline(file, line)) {
+        this->speech_context.push_back(line);
+    }
 }

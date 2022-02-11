@@ -248,7 +248,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         if (!this->args.disable_opensmile) {
             this->opensmile_session->send_eoi();
         }
-
     }
 
     void on_accept(beast::error_code ec) {
@@ -302,12 +301,12 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
             // Push the chunk to the queue for the write_thread
             int count = 0;
-	    while (!this->spsc_queue.push(chunk)) {
-            	count++;
-	    }
-	    if(count > 0){
-		std::cout << count << std::endl;
-	    }
+            while (!this->spsc_queue.push(chunk)) {
+                count++;
+            }
+            if (count > 0) {
+                std::cout << count << std::endl;
+            }
             // Send chunk for raw audio message
             string id = to_string(this->increment);
             this->increment++;

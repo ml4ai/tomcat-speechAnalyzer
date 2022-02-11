@@ -129,9 +129,10 @@ int main(int argc, char* argv[]) {
                 ->default_value(true),
             "Disable the publishing of audio chunk  metadata to the message "
             "bus")(
-	    "intermediate_first_only",
-	    value<bool>(&args.intermediate_first_only)->default_value(false),
-	    "Only publish the first intermediate transcription for each utterance");
+            "intermediate_first_only",
+            value<bool>(&args.intermediate_first_only)->default_value(false),
+            "Only publish the first intermediate transcription for each "
+            "utterance");
 
         variables_map vm;
         store(parse_command_line(argc, argv, desc), vm);

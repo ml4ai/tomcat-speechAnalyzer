@@ -1,11 +1,11 @@
 #include <libpq-fe.h>
 #include <map>
-#include <nlohmann/json.hpp>
-#include <string>
-#include <vector>
-#include <queue>
 #include <mutex>
+#include <nlohmann/json.hpp>
+#include <queue>
+#include <string>
 #include <thread>
+#include <vector>
 
 class DBWrapper {
   public:
@@ -14,7 +14,7 @@ class DBWrapper {
 
     void initialize();
     void shutdown();
-    PGconn *get_connection();
+    PGconn* get_connection();
     void publish_chunk(nlohmann::json message);
     std::vector<nlohmann::json> features_between(double start_time,
                                                  double end_time);
@@ -40,13 +40,13 @@ class DBWrapper {
     std::string host = "features_db";
     std::string port = "5432";
 
-    int thread_pool_size=1;
+    int thread_pool_size = 1;
     std::vector<std::thread> thread_pool;
     std::vector<PGconn*> connection_pool;
     std::vector<std::queue<nlohmann::json>> queue_pool;
 
     bool running = false;
- 
+
     void publish_chunk_private(nlohmann::json message, int index);
     void loop(int index);
 };

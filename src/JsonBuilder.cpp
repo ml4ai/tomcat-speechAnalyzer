@@ -76,8 +76,8 @@ void JsonBuilder::process_message(string message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-	    this->postgres.publish_chunk(this->opensmile_message);
-	    this->opensmile_message["data"]["participant_id"] =
+            this->postgres.publish_chunk(this->opensmile_message);
+            this->opensmile_message["data"]["participant_id"] =
                 this->participant_id;
             this->opensmile_message["header"] =
                 create_common_header("observation");
@@ -118,94 +118,99 @@ void JsonBuilder::process_message(string message) {
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
-    try{
-	    nlohmann::json message;
-	    message["header"] = create_common_header("observation");
-	    message["msg"] = create_common_msg("asr:transcription");
+    try {
+        nlohmann::json message;
+        message["header"] = create_common_header("observation");
+        message["msg"] = create_common_msg("asr:transcription");
 
-	    message["data"]["text"] = response.results(0).alternatives(0).transcript();
-	    message["data"]["is_final"] = response.results(0).is_final();
-	    message["data"]["asr_system"] = "google";
-	    message["data"]["participant_id"] = this->participant_id;
-	    message["data"]["id"] = id;
+        message["data"]["text"] =
+            response.results(0).alternatives(0).transcript();
+        message["data"]["is_final"] = response.results(0).is_final();
+        message["data"]["asr_system"] = "google";
+        message["data"]["participant_id"] = this->participant_id;
+        message["data"]["id"] = id;
 
+        if (!message["data"]["is_final"]) {
 
-	    if(!message["data"]["is_final"]){
-		    
-		    // Handle is_initial field
-		    if(this->is_initial){
-			message["data"]["is_initial"] = true;
-			this->utterance_start_timestamp = boost::posix_time::to_iso_extended_string(
-		      boost::posix_time::microsec_clock::universal_time()) +
-		  "Z";
-			this->is_initial = false;
-		    }
-		    else{
-			// Stop processing if only publishig first intermediate
-			return;
-			message["data"]["is_initial"] = false;
-		    }
-		
-		 // Add start timestamp
-            	message["data"]["start_timestamp"] = this->utterance_start_timestamp;
-		
-		// Publish message
-		this->mosquitto_client.publish("agent/asr/intermediate",
-					       message.dump());
-	    }
-	    else{	
-		    // Add transcription alternatvie
-		    vector<nlohmann::json> alternatives;
-		    auto result = response.results(0);
-		    for (int i = 0; i < result.alternatives_size(); i++) {
-			auto alternative = result.alternatives(i);
-			alternatives.push_back(
-			    nlohmann::json::object({{"text", alternative.transcript()},
-						    {"confidence", alternative.confidence()}}));
-		    }
-		    message["data"]["alternatives"] = alternatives;
-		     
-		// Calculate timestamps
-		auto utt = result.alternatives(0);
-		WordInfo f = utt.words(0);
-		WordInfo l = utt.words(utt.words().size() - 1);
+            // Handle is_initial field
+            if (this->is_initial) {
+                message["data"]["is_initial"] = true;
+                this->utterance_start_timestamp =
+                    boost::posix_time::to_iso_extended_string(
+                        boost::posix_time::microsec_clock::universal_time()) +
+                    "Z";
+                this->is_initial = false;
+            }
+            else {
+                // Stop processing if only publishig first intermediate
+                return;
+                message["data"]["is_initial"] = false;
+            }
 
-		int64_t start_seconds = f.start_time().seconds();
-		int32_t start_nanos = f.start_time().nanos();
-		int64_t end_seconds = l.start_time().seconds();
-		int32_t end_nanos = l.start_time().nanos();
+            // Add start timestamp
+            message["data"]["start_timestamp"] =
+                this->utterance_start_timestamp;
 
-		boost::posix_time::ptime start_timestamp =
-		    this->stream_start_time +
-		    boost::posix_time::seconds(start_seconds) +
-		    boost::posix_time::nanoseconds(start_nanos);
-		boost::posix_time::ptime end_timestamp =
-		    this->stream_start_time + boost::posix_time::seconds(end_seconds) +
-		    boost::posix_time::nanoseconds(end_nanos);
+            // Publish message
+            this->mosquitto_client.publish("agent/asr/intermediate",
+                                           message.dump());
+        }
+        else {
+            // Add transcription alternatvie
+            vector<nlohmann::json> alternatives;
+            auto result = response.results(0);
+            for (int i = 0; i < result.alternatives_size(); i++) {
+                auto alternative = result.alternatives(i);
+                alternatives.push_back(nlohmann::json::object(
+                    {{"text", alternative.transcript()},
+                     {"confidence", alternative.confidence()}}));
+            }
+            message["data"]["alternatives"] = alternatives;
 
-		message["data"]["start_timestamp"] =
-		    boost::posix_time::to_iso_extended_string(start_timestamp) + "Z";
-		message["data"]["end_timestamp"] =
-		    boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
-	    
-		// Add sentiment data
-		string features = this->process_alignment_message(response, id);
-		string mmc = this->process_mmc_message(features);
-		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-	        this->strip_mmc_message(message);
-	        message["data"]["features"] = nlohmann::json::parse(features)["data"];
-	        this->strip_features_message(message);
-	    
-		// Publish message
-		this->mosquitto_client.publish("agent/asr/final", message.dump());
-		
-		this->is_initial = true;	
-	    }
+            // Calculate timestamps
+            auto utt = result.alternatives(0);
+            WordInfo f = utt.words(0);
+            WordInfo l = utt.words(utt.words().size() - 1);
+
+            int64_t start_seconds = f.start_time().seconds();
+            int32_t start_nanos = f.start_time().nanos();
+            int64_t end_seconds = l.start_time().seconds();
+            int32_t end_nanos = l.start_time().nanos();
+
+            boost::posix_time::ptime start_timestamp =
+                this->stream_start_time +
+                boost::posix_time::seconds(start_seconds) +
+                boost::posix_time::nanoseconds(start_nanos);
+            boost::posix_time::ptime end_timestamp =
+                this->stream_start_time +
+                boost::posix_time::seconds(end_seconds) +
+                boost::posix_time::nanoseconds(end_nanos);
+
+            message["data"]["start_timestamp"] =
+                boost::posix_time::to_iso_extended_string(start_timestamp) +
+                "Z";
+            message["data"]["end_timestamp"] =
+                boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
+
+            // Add sentiment data
+            string features = this->process_alignment_message(response, id);
+            string mmc = this->process_mmc_message(features);
+            message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+            this->strip_mmc_message(message);
+            message["data"]["features"] =
+                nlohmann::json::parse(features)["data"];
+            this->strip_features_message(message);
+
+            // Publish message
+            this->mosquitto_client.publish("agent/asr/final", message.dump());
+
+            this->is_initial = true;
+        }
     }
     catch (std::exception const& e) {
-          std::cout << "Error processing Google message" << std::endl;
-          std::cout << "Error was: " << e.what() << std::endl;
-      }
+        std::cout << "Error processing Google message" << std::endl;
+        std::cout << "Error was: " << e.what() << std::endl;
+    }
 }
 
 // Data for handling vosk asr messages
@@ -220,43 +225,45 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
         message["data"]["id"] =
             boost::uuids::to_string(boost::uuids::random_generator()());
         nlohmann::json response_message = nlohmann::json::parse(response);
-        
-	// Handle additional features for intermediate messages 
-	if (response_message.contains("partial")) {
+
+        // Handle additional features for intermediate messages
+        if (response_message.contains("partial")) {
             message["data"]["is_final"] = false;
             message["data"]["text"] = response_message["partial"];
 
-	    // Don't publish dead air messages
-	    string text = message["data"]["text"];
-	    if(text.compare("the") == 0){
-		return;
-	    }
+            // Don't publish dead air messages
+            string text = message["data"]["text"];
+            if (text.compare("the") == 0) {
+                return;
+            }
 
-	    // Handle is_initial field
-	    if(this->is_initial){
-		message["data"]["is_initial"] = true;
-		this->utterance_start_timestamp = boost::posix_time::to_iso_extended_string(
-              boost::posix_time::microsec_clock::universal_time()) +
-          "Z";
-		this->is_initial = false;
-	    }
-	    else{
-		message["data"]["is_initial"] = false;
-	    }
+            // Handle is_initial field
+            if (this->is_initial) {
+                message["data"]["is_initial"] = true;
+                this->utterance_start_timestamp =
+                    boost::posix_time::to_iso_extended_string(
+                        boost::posix_time::microsec_clock::universal_time()) +
+                    "Z";
+                this->is_initial = false;
+            }
+            else {
+                message["data"]["is_initial"] = false;
+            }
 
-	    // Add start timestamp
-	    message["data"]["start_timestamp"] = this->utterance_start_timestamp;
-            
-	    // Publish messsage
-	    this->mosquitto_client.publish("agent/asr/intermediate",
+            // Add start timestamp
+            message["data"]["start_timestamp"] =
+                this->utterance_start_timestamp;
+
+            // Publish messsage
+            this->mosquitto_client.publish("agent/asr/intermediate",
                                            message.dump());
-	}
+        }
         else if (response_message.contains("alternatives")) {
             vector<nlohmann::json> alternatives =
                 response_message["alternatives"];
             vector<nlohmann::json> words = alternatives[0]["result"];
-            
-	    message["data"]["is_final"] = true;
+
+            message["data"]["is_final"] = true;
             message["data"]["text"] =
                 response_message["alternatives"][0]["text"];
 
@@ -286,14 +293,15 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
                 response_message, message["data"]["id"]);
             string mmc = this->process_mmc_message(features);
             message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-	    this->strip_mmc_message(message);
-	    message["data"]["features"] = nlohmann::json::parse(features)["data"];
-	    this->strip_features_message(message);
+            this->strip_mmc_message(message);
+            message["data"]["features"] =
+                nlohmann::json::parse(features)["data"];
+            this->strip_features_message(message);
 
-	    // Publish message
-	    this->mosquitto_client.publish("agent/asr/final", message.dump());
-	    // Set is_initial to true
-	    this->is_initial = true;
+            // Publish message
+            this->mosquitto_client.publish("agent/asr/final", message.dump());
+            // Set is_initial to true
+            this->is_initial = true;
         }
         else {
             return;
@@ -334,7 +342,8 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                 this->sync_time + end_seconds + (end_nanos / 1000000000.0);
             string current_word = word.word();
             // Get extracted features message history
-            vector<nlohmann::json> history = this->postgres.features_between(start_time, end_time);
+            vector<nlohmann::json> history =
+                this->postgres.features_between(start_time, end_time);
             // Initialize the features output by creating a vector for each
             // feature
             nlohmann::json word_message;
@@ -353,7 +362,7 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
                         features_output[it.key()].push_back(entry[it.key()]);
                     }
                 }
-		word_message["features"] = features_output.dump();
+                word_message["features"] = features_output.dump();
             }
             word_message["word"] = current_word;
             word_message["start_time"] = start_time;
@@ -568,26 +577,23 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     return message;
 }
 
-void JsonBuilder::strip_mmc_message(nlohmann::json& message){
-	
-	// Remove buggy speaker field
-	message["data"]["sentiment"].erase("speaker");
-	
+void JsonBuilder::strip_mmc_message(nlohmann::json& message) {
+
+    // Remove buggy speaker field
+    message["data"]["sentiment"].erase("speaker");
 }
 
+void JsonBuilder::strip_features_message(nlohmann::json& message) {
 
-void JsonBuilder::strip_features_message(nlohmann::json& message){
-	
-	// Remove utterance id
-	message["data"]["features"].erase("utterance_id");
+    // Remove utterance id
+    message["data"]["features"].erase("utterance_id");
 
-	// Remove features text
-	message["data"]["features"].erase("text");
+    // Remove features text
+    message["data"]["features"].erase("text");
 
-	// Remove vocalic features
-      for (int i = 0; i < message["data"]["features"]["word_messages"].size(); i++) {
-	  message["data"]["features"]["word_messages"][i].erase("features");
-      }
-      
+    // Remove vocalic features
+    for (int i = 0; i < message["data"]["features"]["word_messages"].size();
+         i++) {
+        message["data"]["features"]["word_messages"][i].erase("features");
+    }
 }
-
