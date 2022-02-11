@@ -33,6 +33,4 @@ class SpeechWrapper {
     void initialize_stream();
     void send_config();
 
-    void load_speech_context();
-    std::vector<std::string> speech_context;
 };
