@@ -12,6 +12,7 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <libpq-fe.h>
 #include <nlohmann/json.hpp>
@@ -92,22 +93,13 @@ void DBWrapper::publish_chunk_private(nlohmann::json message, int index) {
     // Get timestamp
     this->timestamp = message["data"]["tmeta"]["time"];
 
-    // Create client_id
-    /*
-    if(message["data"]["participant_id"] != nullptr && !this->participant_id_set){ 
-	    this->participant_id_set = true;
-	    this->participant_id = to_string(message["data"]["participant_id"]);
-	    boost::replace_all(this->participant_id, "\"", "\'");
-    }
-    if(message["msg"]["trial_id"] != nullptr && !this->trial_id_set){
-    	this->trial_id_set = true;
-	this->trial_id = to_string(message["msg"]["trial_id"]);
-    	boost::replace_all(this->trial_id, "\"", "\'");
-    }*/
 
     this->participant_id = to_string(message["data"]["participant_id"]);
+    boost::replace_all(this->participant_id, "\"", "\'");
     this->trial_id = to_string(message["msg"]["trial_id"]);
+    boost::replace_all(this->trial_id, "\"", "\'");
     this->experiment_id = to_string(message["msg"]["experiment_id"]);
+    boost::replace_all(this->experiment_id, "\"", "\'");
    
     // Convert columns to string format
     ostringstream oss;
@@ -126,8 +118,12 @@ void DBWrapper::publish_chunk_private(nlohmann::json message, int index) {
     for (double element : values) {
         oss << to_string(element) << ",";
     }
+    std::string utc_timestamp = boost::posix_time::to_iso_extended_string(
+                      boost::posix_time::microsec_clock::universal_time()) +
+                  "Z";
+
     oss << message["data"]["tmeta"]["time"] << ","
-        << "\'NA\', "
+        << "\'" <<  utc_timestamp  << "\'" <<  ","
 	<< message["data"]["participant_id"] << ","
         << message["msg"]["trial_id"] << ","
 	<< message["msg"]["experiment_id"];
@@ -163,7 +159,8 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     // Get features from database
     std::string query =
         "SELECT * FROM features WHERE seconds_offset >= " + to_string(start_time) +
-        " and timestamp <= " + to_string(end_time) +  " and participant=" + this->participant_id; //+ 
+        " and seconds_offset <= " + to_string(end_time) +  " and participant=" + this->participant_id + 
+	" and trial_id=" + this->trial_id; //+ 
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
         std::cout << "FAILURE" << std::endl;
