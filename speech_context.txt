@@ -1,0 +1,47 @@
+critical
+victim
+critical victim
+medic
+engineer
+searcher
+medic
+engineer 
+room 
+door 
+building
+stairs
+window
+floor
+ceiling
+lever
+button
+rubble
+building collapse
+move
+open
+close
+push
+toggle
+communicate
+continue
+savet
+sight
+question
+agreement
+disagreement
+comit
+clear
+role
+role switch
+search
+chagne priority
+precedence
+victim
+yellow
+green
+friend
+player
+medkit
+hammer
+stretcher
+map
