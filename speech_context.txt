@@ -27,6 +27,7 @@ ceiling
 lever
 button
 rubble
+rubble block
 building collapse
 collapse
 move
@@ -59,6 +60,9 @@ stretcher
 map
 red
 blue
+blue suit
+red suit
+green suit
 searching
 strategy
 doorway
@@ -158,4 +162,69 @@ C
 type C
 a C victim
 a C
-
+marker
+block
+marker block
+mild
+moderate
+severe
+mild damage
+moderate damage
+severe damage
+meetings
+left side
+right side
+middle
+human resources
+facilities meeting
+project meeting
+security meeting
+zoom2
+zoom2 from office
+zoom
+zoom meeting
+management meeting
+storage reorganization
+lunch
+meeting
+planned meeting
+attendees
+stabilize
+safe block
+safe zone
+diagnose
+injury level
+abrasion
+bone damage
+life threatening
+awaken
+breath bubbles
+destroy
+sledgehammer
+hammer
+first aid kit
+stretcher
+tool
+threat
+threat room
+trapped
+icon
+detection
+device
+detection device
+victim detection device
+north zone
+south zone
+zone
+relocate
+building structure
+news room
+updates
+news room updates
+grid
+SOS
+help me
+help me here
+ground
+navigate
+approach
