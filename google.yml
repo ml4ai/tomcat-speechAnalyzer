@@ -1,0 +1,53 @@
+version: '3'
+
+networks:
+  asist_net:
+   external: true
+    
+services:
+  speech_analyzer_agent:
+#    image: gitlab.asist.aptima.com:5050/asist/testbed/speech_analyzer_agent:speech_adaption
+    image: speech_analyzer_agent:latest
+    container_name: AC_UAZ_TA1_ToMCAT-SpeechAnalyzer
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json
+    volumes:
+      - ./google_application_credentials.json:/google_application_credentials.json
+    networks:
+      asist_net:
+        aliases:
+          - speech_analyzer_agent
+    ports:
+      - 8888:8888
+    entrypoint: ./speechAnalyzer --mode websocket --mqtt_host host.docker.internal --disable_opensmile false --disable_asr_google false --disable_asr_vosk true
+#    entrypoint: ./speechAnalyzer --mode websocket --mqtt_host host.docker.internal --disable_opensmile false --disable_asr_google false --disable_asr_vosk true
+  db:
+    image: gitlab.asist.aptima.com:5050/asist/testbed/features_database:1.1.0
+    container_name: AC_UAZ_TA1_ToMCAT-SpeechAnalyzer-db
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: docker
+    ports:
+      - 63332:5432
+    networks:
+      asist_net:
+        aliases:
+          - features_db
+  mmc:
+    image: gitlab.asist.aptima.com:5050/asist/testbed/mmc:1.0.0
+    container_name: AC_UAZ_TA1_ToMCAT-SpeechAnalyzer-mmc
+    networks:
+      asist_net:
+        aliases:
+          - mmc
+    entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
+  heartbeat:
+    image: gitlab.asist.aptima.com:5050/asist/testbed/heartbeat:1.0.0
+    container_name: AC_UAZ_TA1_ToMCAT-SpeechAnalyzer-heartbeat
+    volumes:
+      - ./config.json:/heartbeat/config.json
+    networks:
+      asist_net:
+        aliases:
+          - heartbeat-speech_analyzer_agent
+    entrypoint: ["python3", "heartbeat.py"]
