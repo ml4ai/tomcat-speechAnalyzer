@@ -54,3 +54,5 @@ RUN mkdir build && cd build && cmake .. -DBUILD_GOOGLE_CLOUD_SPEECH_LIB=OFF &&\
 
 # Build speechAnalyzer
 WORKDIR /speechAnalyzer/build
+
+COPY speech_context.txt /speechAnalyzer/build
