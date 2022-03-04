@@ -31,3 +31,10 @@
 build/
 lib/
 version.cpp
+
+# google credentials
+google_application_credentials.json
+
+# hidden files
+.DS_Store
+.idea/
