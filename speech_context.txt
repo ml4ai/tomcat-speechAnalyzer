@@ -82,10 +82,56 @@ path
 pass
 pick up
 rescue
+A1
+A2
+A3
+A4
+A4A
+B1
+B2
+B3
+B4
+B5
+B6
+B7
+B8
+B9
+C1
+C2
+C3
+C4
+C5
+C6
+C7
+C8
+D1
+D2
+D3
+D4
+E1
+E2
+E3
+E4
+E5
+F1
+F2
+F3
+F4
+F5
 G1
 G2
 G3
-G4
+H1
+H2
+H1A
+I1
+I2
+I3
+I4
+I1A
+I2A
+I3A
+I4A
 J1
 J2
 J3
@@ -97,12 +143,19 @@ K4
 L1
 L2
 L3
-L4
 M1
 M2
 M3
-M4
-H1
-H2
-H3
-H4
+A
+type A
+an A
+an A victim
+B
+type B
+a B victim
+a B
+C
+type C
+a C victim
+a C
+
