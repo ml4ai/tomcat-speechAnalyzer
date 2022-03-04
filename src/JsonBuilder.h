@@ -1,7 +1,8 @@
 #pragma once
 #include "Mosquitto.h"
 #include "TrialListener.h"
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <deque>
 #include <nlohmann/json.hpp>
@@ -28,7 +29,8 @@ class JsonBuilder {
 
     // Process an asr message
     void process_asr_message(
-        google::cloud::speech::v1::StreamingRecognizeResponse response,
+//        google::cloud::speech::v1::StreamingRecognizeResponse response,
+        google::cloud::speech::v1p1beta1::StreamingRecognizeResponse response,
         std::string id);
 
     // Process an asr message from vosk
@@ -36,7 +38,8 @@ class JsonBuilder {
 
     // Process a word/feature alignment message
     std::string process_alignment_message(
-        google::cloud::speech::v1::StreamingRecognizeResponse response,
+//        google::cloud::speech::v1::StreamingRecognizeResponse response,
+        google::cloud::speech::v1p1beta1::StreamingRecognizeResponse response,
         std::string id);
     std::string process_alignment_message_vosk(nlohmann::json response,
                                                std::string id);

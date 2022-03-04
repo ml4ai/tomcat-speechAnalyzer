@@ -1,16 +1,25 @@
 #include <fstream>
 #include <string>
+#include <iostream>
+#include <string>
+#include <typeinfo>
 
 #include "SpeechWrapper.h"
 
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 
-using google::cloud::speech::v1::RecognitionConfig;
-using google::cloud::speech::v1::Speech;
-using google::cloud::speech::v1::StreamingRecognizeRequest;
-using google::cloud::speech::v1::StreamingRecognizeResponse;
-using google::cloud::speech::v1::StreamingRecognitionConfig;
+//using google::cloud::speech::v1::RecognitionConfig;
+//using google::cloud::speech::v1::Speech;
+//using google::cloud::speech::v1::StreamingRecognizeRequest;
+//using google::cloud::speech::v1::StreamingRecognizeResponse;
+//using google::cloud::speech::v1::StreamingRecognitionConfig;
+using google::cloud::speech::v1p1beta1::RecognitionConfig;
+using google::cloud::speech::v1p1beta1::Speech;
+using google::cloud::speech::v1p1beta1::StreamingRecognizeRequest;
+using google::cloud::speech::v1p1beta1::StreamingRecognizeResponse;
+using google::cloud::speech::v1p1beta1::StreamingRecognitionConfig;
 
 using namespace std;
 
@@ -72,17 +81,54 @@ void SpeechWrapper::send_config() {
     StreamingRecognitionConfig* streaming_config = config_request.mutable_streaming_config();
 
     RecognitionConfig* mutable_config = streaming_config->mutable_config();
-    mutable_config->set_language_code("en");
+//    mutable_config->set_language_code("en");
+    mutable_config->set_language_code("en-US");
     mutable_config->set_sample_rate_hertz(this->sample_rate);
     mutable_config->set_encoding(RecognitionConfig::LINEAR16);
     mutable_config->set_max_alternatives(5);
     mutable_config->set_enable_word_time_offsets(true);
+    // converting to the 'video' model seems to have a great impact on output
+    mutable_config->set_model("video");
 
     // Add speech context phrases
     auto context = mutable_config->add_speech_contexts();
+//    context->add_phrases("rubble cave-in");
+//    context->set_boost(10000.0);
+
     for (string phrase : this->speech_context) {
         context->add_phrases(phrase);
+        // try adding boosts to each phrase ?
+//        if (phrase.find("rubble") != string::npos) {
+//            context->set_boost(20.0);
+//            float boost = 20.0;
+//            std::cout << phrase << " ";
+//            std::cout << boost << std::endl;
+//        } else {
+        context->set_boost(7.5);
+//        float boost = 10.0;
+//        std::cout << phrase << " ";
+//        std::cout << boost << std::endl;
+//        }
+
+
     }
+////    std::cout << speech_context.phrases << std::endl;
+//    // try adding a single boost to all phrases first
+//    context->set_boost(10000.0);
+
+//    std::cout << "this part has worked" << std::endl;
+
+//    std::cout << typeid(mutable_config).name() << std::endl;
+
+//    std::string config_info = *mutable_config;
+//    std::cout << config_info << std::endl;
+//    std::cout << context << std::endl;
+//    std::cout << streaming_config;
+
+//    ofstream thefile;
+//    thefile.open ("google_config.txt");
+//    thefile << mutable_config;
+//    thefile.close();
 
     streaming_config->set_interim_results(true);
     streamer->Write(config_request);
@@ -92,6 +138,13 @@ void SpeechWrapper::load_speech_context() {
     ifstream file("speech_context.txt");
     string line;
     while (getline(file, line)) {
+//        std::cout << line << std::endl;
         this->speech_context.push_back(line);
     }
+//    std::vector<char> speech_context = speech_context;
+//    for (char i: speech_context) {
+//        std::cout << i << std::endl;
+//    }
+
+//    std::cout << speech_context << std::endl;
 }
