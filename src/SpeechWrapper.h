@@ -29,8 +29,10 @@ class SpeechWrapper {
     int sample_rate = 48000;
     bool dummy_read = false;
     bool finished = false;
+    std::vector<std::string> speech_context;
 
     void initialize_stream();
+    void load_speech_context();
     void send_config();
 
 };

@@ -1,5 +1,6 @@
 #include <fstream>
 #include <string>
+#include <algorithm>
 
 #include "SpeechWrapper.h"
 
@@ -64,6 +65,7 @@ void SpeechWrapper::initialize_stream() {
 }
 
 void SpeechWrapper::send_config() {
+    this->load_speech_context();
 
     // Write first request with config
     StreamingRecognizeRequest config_request;
@@ -75,8 +77,40 @@ void SpeechWrapper::send_config() {
     mutable_config->set_encoding(RecognitionConfig::LINEAR16);
     mutable_config->set_max_alternatives(5);
     mutable_config->set_enable_word_time_offsets(true);
+    mutable_config->set_model("video");
+
+    auto context = mutable_config->add_speech_contexts();
+    for(string phrase : this->speech_context){
+	context->add_phrases(phrase);
+    }
 
     streaming_config->set_interim_results(true);
     streamer->Write(config_request);
 }
 
+void SpeechWrapper::load_speech_context() {
+    int line_count=0;
+    int character_count=0;
+    int max_character_length=0;
+    
+    ifstream file("conf/speech_context.txt");
+    string line;
+    while (getline(file, line)) {
+	// Check if comment
+	if(line.find('#') != string::npos){
+		continue;
+	}
+
+	line_count++;
+	character_count += line.length();
+	max_character_length = max<int>(max_character_length,line.length());
+        this->speech_context.push_back(line);
+    }
+
+    // Check size of context
+    if(line_count > 5000 || character_count > 100000 || max_character_length > 100){
+	std::cout << "Speech context file exceeds limit" << std::endl;
+    	this->speech_context.clear();
+    }
+
+}
