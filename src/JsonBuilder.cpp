@@ -4,7 +4,8 @@
 #include "arguments.h"
 #include "base64.h"
 
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
+//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -31,8 +32,10 @@ namespace http = beast::http;   // from <boost/beast/http.hpp>
 namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-using google::cloud::speech::v1::StreamingRecognizeResponse;
-using google::cloud::speech::v1::WordInfo;
+using google::cloud::speech::v1p1beta1::StreamingRecognizeResponse;
+using google::cloud::speech::v1p1beta1::WordInfo;
+/*using google::cloud::speech::v1::StreamingRecognizeResponse;
+using google::cloud::speech::v1::WordInfo;*/
 using namespace std;
 
 JsonBuilder::JsonBuilder() {

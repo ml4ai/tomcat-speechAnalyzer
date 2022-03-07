@@ -3,7 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
+//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 
 class SpeechWrapper {
@@ -14,8 +15,10 @@ class SpeechWrapper {
 
     // Speech Session state variables
     std::unique_ptr<grpc::ClientReaderWriterInterface<
-        google::cloud::speech::v1::StreamingRecognizeRequest,
-        google::cloud::speech::v1::StreamingRecognizeResponse>>
+       google::cloud::speech::v1p1beta1::StreamingRecognizeRequest,
+       google::cloud::speech::v1p1beta1::StreamingRecognizeResponse>>
+       //google::cloud::speech::v1::StreamingRecognizeRequest,
+       //google::cloud::speech::v1::StreamingRecognizeResponse>>
         streamer;
     grpc::Status status;
     grpc::ClientContext context;

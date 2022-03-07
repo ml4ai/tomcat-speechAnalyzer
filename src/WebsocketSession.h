@@ -22,16 +22,20 @@
 #include "OpensmileSession.h"
 #include "SpeechWrapper.h"
 #include "SpeechWrapperVosk.h"
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
+//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <smileapi/SMILEapi.h>
 
 #include "arguments.h"
 #include "util.h"
 
-using google::cloud::speech::v1::Speech;
+using google::cloud::speech::v1p1beta1::Speech;
+using google::cloud::speech::v1p1beta1::StreamingRecognizeRequest;
+using google::cloud::speech::v1p1beta1::StreamingRecognizeResponse;
+/*using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
-using google::cloud::speech::v1::StreamingRecognizeResponse;
+using google::cloud::speech::v1::StreamingRecognizeResponse;*/
 
 namespace beast = boost::beast;   // from <boost/beast.hpp>
 namespace http = beast::http;     // from <boost/beast/http.hpp>
