@@ -51,7 +51,7 @@ void DBWrapper::shutdown() {
         this->thread_pool[i].join();
         PQfinish(this->connection_pool[i]);
     }
-    std::cout << "Shutdown DB connections" << std::endl;
+    //std::cout << "Shutdown DB connections" << std::endl;
 }
 
 PGconn* DBWrapper::get_connection() {
