@@ -23,6 +23,9 @@ class JsonBuilder {
     JsonBuilder();
     ~JsonBuilder();
 
+    void Initialize();
+    void Shutdown();
+
     // Process an openSMILE log messag
     void process_message(std::string message);
 
