@@ -74,7 +74,7 @@ void SpeechWrapper::initialize_stream() {
 
 void SpeechWrapper::send_config() {
     // Load speech context
-    this->load_speech_context();
+//    this->load_speech_context();
 
     // Write first request with config
     StreamingRecognizeRequest config_request;
@@ -91,12 +91,12 @@ void SpeechWrapper::send_config() {
     mutable_config->set_model("video");
 
     // Add speech context phrases
-    auto context = mutable_config->add_speech_contexts();
+//    auto context = mutable_config->add_speech_contexts();
 //    context->add_phrases("rubble cave-in");
 //    context->set_boost(10000.0);
 
-    for (string phrase : this->speech_context) {
-        context->add_phrases(phrase);
+//    for (string phrase : this->speech_context) {
+//        context->add_phrases(phrase);
         // try adding boosts to each phrase ?
 //        if (phrase.find("rubble") != string::npos) {
 //            context->set_boost(20.0);
@@ -104,14 +104,14 @@ void SpeechWrapper::send_config() {
 //            std::cout << phrase << " ";
 //            std::cout << boost << std::endl;
 //        } else {
-        context->set_boost(7.5);
+//        context->set_boost(7.5);
 //        float boost = 10.0;
 //        std::cout << phrase << " ";
 //        std::cout << boost << std::endl;
 //        }
 
 
-    }
+//    }
 ////    std::cout << speech_context.phrases << std::endl;
 //    // try adding a single boost to all phrases first
 //    context->set_boost(10000.0);
