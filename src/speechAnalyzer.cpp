@@ -139,7 +139,7 @@ int main(int argc, char* argv[]) {
         notify(vm);
     }
     catch (const error& ex) {
-        cout << "Error parsing arguments" << endl;
+        BOOST_LOG_TRIVIAL(error) << "Error parsing arguments!";
         return -1;
     }
 
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
         thread_object.join();
     }
     else {
-        cout << "Unknown mode" << endl;
+        BOOST_LOG_TRIVIAL(info) << "Unknown mode";
     }
 
     // Join Global Listener
