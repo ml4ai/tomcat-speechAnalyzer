@@ -19,10 +19,8 @@
 
 namespace beast = boost::beast; // from <boost/beast.hpp>
 
-using google::cloud::speech::v1p1beta1::StreamingRecognizeRequest;
-using google::cloud::speech::v1p1beta1::StreamingRecognizeResponse;
-//using google::cloud::speech::v1::StreamingRecognizeRequest;
-//using google::cloud::speech::v1::StreamingRecognizeResponse;
+using google::cloud::speech::v1::StreamingRecognizeRequest;
+using google::cloud::speech::v1::StreamingRecognizeResponse;
 using namespace std;
 
 // Report a failure

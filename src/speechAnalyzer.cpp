@@ -32,8 +32,7 @@
 #include "JsonBuilder.h"
 #include "Mosquitto.h"
 #include "SpeechWrapper.h"
-#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
-//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 #include <smileapi/SMILEapi.h>
 
@@ -58,16 +57,11 @@ namespace http = beast::http;   // from <boost/beast/http.hpp>
 namespace net = boost::asio;    // from <boost/asio.hpp>
 using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
-using google::cloud::speech::v1p1beta1::RecognitionConfig;
-using google::cloud::speech::v1p1beta1::Speech;
-using google::cloud::speech::v1p1beta1::StreamingRecognizeRequest;
-using google::cloud::speech::v1p1beta1::StreamingRecognizeResponse;
-using google::cloud::speech::v1p1beta1::WordInfo;
-/*using google::cloud::speech::v1::RecognitionConfig;
+using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
-using google::cloud::speech::v1::WordInfo;*/
+using google::cloud::speech::v1::WordInfo;
 using namespace boost::program_options;
 using namespace boost::chrono;
 using namespace std;
