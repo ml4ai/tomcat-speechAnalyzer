@@ -4,20 +4,14 @@
 
 #include "SpeechWrapper.h"
 
-#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
-//#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <grpc++/grpc++.h>
 
-using google::cloud::speech::v1p1beta1::RecognitionConfig;
-using google::cloud::speech::v1p1beta1::Speech;
-using google::cloud::speech::v1p1beta1::StreamingRecognizeRequest;
-using google::cloud::speech::v1p1beta1::StreamingRecognizeResponse;
-using google::cloud::speech::v1p1beta1::StreamingRecognitionConfig;
-/*using google::cloud::speech::v1::Speech;
+using google::cloud::speech::v1::Speech;
 using google::cloud::speech::v1::RecognitionConfig;
 using google::cloud::speech::v1::StreamingRecognizeRequest;
 using google::cloud::speech::v1::StreamingRecognizeResponse;
-using google::cloud::speech::v1::StreamingRecognitionConfig;*/
+using google::cloud::speech::v1::StreamingRecognitionConfig;
 
 using namespace std;
 
@@ -79,18 +73,18 @@ void SpeechWrapper::send_config() {
 
     RecognitionConfig* mutable_config = streaming_config->mutable_config();
     mutable_config->set_language_code("en-US");
-    mutable_config->set_use_enhanced(true);
-    mutable_config->set_model("video");
     mutable_config->set_sample_rate_hertz(this->sample_rate);
     mutable_config->set_encoding(RecognitionConfig::LINEAR16);
     mutable_config->set_max_alternatives(5);
     mutable_config->set_enable_word_time_offsets(true);
+    mutable_config->set_use_enhanced(true);
+    mutable_config->set_model("video");
 
-    /*auto context = mutable_config->add_speech_contexts();
+    auto context = mutable_config->add_speech_contexts();
     for(string phrase : this->speech_context){
 	context->add_phrases(phrase);
 	context->set_boost(7.5);
-    }*/
+    }
 
     streaming_config->set_interim_results(true);
     streamer->Write(config_request);
