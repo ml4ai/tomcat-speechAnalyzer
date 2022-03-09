@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/log/trivial.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -51,7 +52,7 @@ void DBWrapper::shutdown() {
         this->thread_pool[i].join();
         PQfinish(this->connection_pool[i]);
     }
-    //std::cout << "Shutdown DB connections" << std::endl;
+    //BOOST_LOG_TRIVIAL(error) << "Shutdown DB connections";
 }
 
 PGconn* DBWrapper::get_connection() {
@@ -135,8 +136,7 @@ void DBWrapper::publish_chunk_private(nlohmann::json message, int index) {
     // Send query
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
-        std::cout << "Execution error: " << std::endl;
-        std::cout << PQerrorMessage(conn) << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Execution error: " << PQerrorMessage(conn);
     }
     // Clear result
     PQclear(result);
@@ -150,8 +150,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     // Create connection
     conn = PQconnectdb(this->connection_string.c_str());
     if (PQstatus(conn) != CONNECTION_OK) {
-        std::cout << "Connection error: " << std::endl;
-        std::cout << PQerrorMessage(conn) << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Connection error: " << PQerrorMessage(conn);
     }
 
     // Get features from database
@@ -162,8 +161,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
                         " and trial_id=" + this->trial_id; //+
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
-        std::cout << "FAILURE" << std::endl;
-        std::cout << PQerrorMessage(conn) << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "FAILURE" << PQerrorMessage(conn);
     }
     // Turn features into json object
     vector<nlohmann::json> out;
