@@ -575,7 +575,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "3.4.0";
+    message["version"] = "3.5.0";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
