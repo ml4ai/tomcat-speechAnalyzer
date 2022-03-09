@@ -2,6 +2,8 @@
 #include <string>
 #include <algorithm>
 
+#include <boost/log/trivial.hpp>
+
 #include "SpeechWrapper.h"
 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
@@ -94,7 +96,7 @@ void SpeechWrapper::load_speech_context() {
     int line_count=0;
     int character_count=0;
     int max_character_length=0;
-    
+
     ifstream file("conf/speech_context.txt");
     string line;
     while (getline(file, line)) {
@@ -109,9 +111,21 @@ void SpeechWrapper::load_speech_context() {
         this->speech_context.push_back(line);
     }
 
-    // Check size of context
-    if(line_count > 5000 || character_count > 100000 || max_character_length > 100){
-	std::cout << "Speech context file exceeds limit" << std::endl;
+    // Check limits
+    if (line_count > 5000){
+        BOOST_LOG_TRIVIAL(error) << "Number of phrases provided for speech adaptation ("
+            << line_count << ") exceeds the limit (5000)!";
+    	this->speech_context.clear();
+    }
+    if (character_count > 100000){
+        BOOST_LOG_TRIVIAL(error) << "Number of characters provided for speech adaptation ("
+            << character_count << ") exceeds the limit (100,000)!";
+    	this->speech_context.clear();
+    }
+
+    if (max_character_length > 100){
+        BOOST_LOG_TRIVIAL(error) << "Maximum number of characters per phrase for speech adaptation ("
+            << max_character_length << ") exceeds the limit (100)!";
     	this->speech_context.clear();
     }
 
