@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@ syntax = "proto3";
 
 package google.cloud.security.privateca.v1;
 
+import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/type/expr.proto";
-import "google/api/annotations.proto";
 
 option cc_enable_arenas = true;
 option csharp_namespace = "Google.Cloud.Security.PrivateCA.V1";
@@ -39,34 +39,6 @@ message CertificateAuthority {
     type: "privateca.googleapis.com/CertificateAuthority"
     pattern: "projects/{project}/locations/{location}/caPools/{ca_pool}/certificateAuthorities/{certificate_authority}"
   };
-
-  // URLs where a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] will publish content.
-  message AccessUrls {
-    // The URL where this [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CA certificate is
-    // published. This will only be set for CAs that have been activated.
-    string ca_certificate_access_url = 1;
-
-    // The URLs where this [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CRLs are published. This
-    // will only be set for CAs that have been activated.
-    repeated string crl_access_urls = 2;
-  }
-
-  // A Cloud KMS key configuration that a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] will use.
-  message KeyVersionSpec {
-    oneof KeyVersion {
-      // The resource name for an existing Cloud KMS CryptoKeyVersion in the
-      // format
-      // `projects/*/locations/*/keyRings/*/cryptoKeys/*/cryptoKeyVersions/*`.
-      // This option enables full flexibility in the key's capabilities and
-      // properties.
-      string cloud_kms_key_version = 1;
-
-      // The algorithm to use for creating a managed Cloud KMS key for a for a
-      // simplified experience. All managed keys will be have their
-      // [ProtectionLevel][google.cloud.kms.v1.ProtectionLevel] as `HSM`.
-      SignHashAlgorithm algorithm = 2;
-    }
-  }
 
   // The type of a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority], indicating its issuing chain.
   enum Type {
@@ -115,6 +87,34 @@ message CertificateAuthority {
     DELETED = 5;
   }
 
+  // URLs where a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] will publish content.
+  message AccessUrls {
+    // The URL where this [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CA certificate is
+    // published. This will only be set for CAs that have been activated.
+    string ca_certificate_access_url = 1;
+
+    // The URLs where this [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CRLs are published. This
+    // will only be set for CAs that have been activated.
+    repeated string crl_access_urls = 2;
+  }
+
+  // A Cloud KMS key configuration that a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] will use.
+  message KeyVersionSpec {
+    oneof KeyVersion {
+      // The resource name for an existing Cloud KMS CryptoKeyVersion in the
+      // format
+      // `projects/*/locations/*/keyRings/*/cryptoKeys/*/cryptoKeyVersions/*`.
+      // This option enables full flexibility in the key's capabilities and
+      // properties.
+      string cloud_kms_key_version = 1;
+
+      // The algorithm to use for creating a managed Cloud KMS key for a for a
+      // simplified experience. All managed keys will be have their
+      // [ProtectionLevel][google.cloud.kms.v1.ProtectionLevel] as `HSM`.
+      SignHashAlgorithm algorithm = 2;
+    }
+  }
+
   // The algorithm of a Cloud KMS CryptoKeyVersion of a
   // [CryptoKey][google.cloud.kms.v1.CryptoKey] with the
   // [CryptoKeyPurpose][google.cloud.kms.v1.CryptoKey.CryptoKeyPurpose] value
@@ -122,7 +122,7 @@ message CertificateAuthority {
   // [CryptoKeyVersionAlgorithm][google.cloud.kms.v1.CryptoKeyVersion.CryptoKeyVersionAlgorithm]
   // values. For RSA signing algorithms, the PSS algorithms should be preferred,
   // use PKCS1 algorithms if required for compatibility. For further
-  // recommandations, see
+  // recommendations, see
   // https://cloud.google.com/kms/docs/algorithms#algorithm_recommendations.
   enum SignHashAlgorithm {
     // Not specified.
@@ -169,10 +169,13 @@ message CertificateAuthority {
     (google.api.field_behavior) = IMMUTABLE
   ];
 
-  // Required. The desired lifetime of the CA certificate. Used to create the
+  // Required. Immutable. The desired lifetime of the CA certificate. Used to create the
   // "not_before_time" and "not_after_time" fields inside an X.509
   // certificate.
-  google.protobuf.Duration lifetime = 4 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.Duration lifetime = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_behavior) = IMMUTABLE
+  ];
 
   // Required. Immutable. Used when issuing certificates for this [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]. If this
   // [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] is a self-signed CertificateAuthority, this key
@@ -246,26 +249,39 @@ message CaPool {
     pattern: "projects/{project}/locations/{location}/caPools/{ca_pool}"
   };
 
+  // The tier of a [CaPool][google.cloud.security.privateca.v1.CaPool], indicating its supported functionality and/or
+  // billing SKU.
+  enum Tier {
+    // Not specified.
+    TIER_UNSPECIFIED = 0;
+
+    // Enterprise tier.
+    ENTERPRISE = 1;
+
+    // DevOps tier.
+    DEVOPS = 2;
+  }
+
   // Options relating to the publication of each [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CA
   // certificate and CRLs and their inclusion as extensions in issued
   // [Certificates][google.cloud.security.privateca.v1.Certificate]. The options set here apply to certificates
   // issued by any [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] in the [CaPool][google.cloud.security.privateca.v1.CaPool].
   message PublishingOptions {
-    // Required. When true, publishes each [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CA certificate and
+    // Optional. When true, publishes each [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CA certificate and
     // includes its URL in the "Authority Information Access" X.509 extension
     // in all issued [Certificates][google.cloud.security.privateca.v1.Certificate]. If this is false, the CA
     // certificate will not be published and the corresponding X.509 extension
     // will not be written in issued certificates.
-    bool publish_ca_cert = 1 [(google.api.field_behavior) = REQUIRED];
+    bool publish_ca_cert = 1 [(google.api.field_behavior) = OPTIONAL];
 
-    // Required. When true, publishes each [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CRL and includes its
+    // Optional. When true, publishes each [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]'s CRL and includes its
     // URL in the "CRL Distribution Points" X.509 extension in all issued
     // [Certificates][google.cloud.security.privateca.v1.Certificate]. If this is false, CRLs will not be published
     // and the corresponding X.509 extension will not be written in issued
     // certificates.
     // CRLs will expire 7 days from their creation. However, we will rebuild
     // daily. CRLs are also rebuilt shortly after a certificate is revoked.
-    bool publish_crl = 2 [(google.api.field_behavior) = REQUIRED];
+    bool publish_crl = 2 [(google.api.field_behavior) = OPTIONAL];
   }
 
   // Defines controls over all certificate issuance within a [CaPool][google.cloud.security.privateca.v1.CaPool].
@@ -279,14 +295,14 @@ message CaPool {
       // Describes an RSA key that may be used in a [Certificate][google.cloud.security.privateca.v1.Certificate] issued from
       // a [CaPool][google.cloud.security.privateca.v1.CaPool].
       message RsaKeyType {
-        // Optional. The minimum allowed RSA modulus size, in bits. If this is not set,
-        // or if set to zero, the service-level min RSA modulus size will
-        // continue to apply.
+        // Optional. The minimum allowed RSA modulus size (inclusive), in bits. If this is
+        // not set, or if set to zero, the service-level min RSA modulus size
+        // will continue to apply.
         int64 min_modulus_size = 1 [(google.api.field_behavior) = OPTIONAL];
 
-        // Optional. The maximum allowed RSA modulus size, in bits. If this is not set,
-        // or if set to zero, the service will not enforce an explicit upper
-        // bound on RSA modulus sizes.
+        // Optional. The maximum allowed RSA modulus size (inclusive), in bits. If this is
+        // not set, or if set to zero, the service will not enforce an explicit
+        // upper bound on RSA modulus sizes.
         int64 max_modulus_size = 2 [(google.api.field_behavior) = OPTIONAL];
       }
 
@@ -330,13 +346,13 @@ message CaPool {
     // [Certificates][google.cloud.security.privateca.v1.Certificate] may be requested from this
     // [CaPool][google.cloud.security.privateca.v1.CaPool].
     message IssuanceModes {
-      // Required. When true, allows callers to create [Certificates][google.cloud.security.privateca.v1.Certificate] by
+      // Optional. When true, allows callers to create [Certificates][google.cloud.security.privateca.v1.Certificate] by
       // specifying a CSR.
-      bool allow_csr_based_issuance = 1 [(google.api.field_behavior) = REQUIRED];
+      bool allow_csr_based_issuance = 1 [(google.api.field_behavior) = OPTIONAL];
 
-      // Required. When true, allows callers to create [Certificates][google.cloud.security.privateca.v1.Certificate] by
+      // Optional. When true, allows callers to create [Certificates][google.cloud.security.privateca.v1.Certificate] by
       // specifying a [CertificateConfig][google.cloud.security.privateca.v1.CertificateConfig].
-      bool allow_config_based_issuance = 2 [(google.api.field_behavior) = REQUIRED];
+      bool allow_config_based_issuance = 2 [(google.api.field_behavior) = OPTIONAL];
     }
 
     // Optional. If any [AllowedKeyType][google.cloud.security.privateca.v1.CaPool.IssuancePolicy.AllowedKeyType] is specified, then the certificate request's
@@ -380,19 +396,6 @@ message CaPool {
     // certificate's X.509 extensions. These constraints do not apply to X.509
     // extensions set in this [CaPool][google.cloud.security.privateca.v1.CaPool]'s [baseline_values][google.cloud.security.privateca.v1.CaPool.IssuancePolicy.baseline_values].
     CertificateExtensionConstraints passthrough_extensions = 6 [(google.api.field_behavior) = OPTIONAL];
-  }
-
-  // The tier of a [CaPool][google.cloud.security.privateca.v1.CaPool], indicating its supported functionality and/or
-  // billing SKU.
-  enum Tier {
-    // Not specified.
-    TIER_UNSPECIFIED = 0;
-
-    // Enterprise tier.
-    ENTERPRISE = 1;
-
-    // DevOps tier.
-    DEVOPS = 2;
   }
 
   // Output only. The resource name for this [CaPool][google.cloud.security.privateca.v1.CaPool] in the
@@ -691,10 +694,9 @@ message SubordinateConfig {
   }
 
   oneof subordinate_config {
-    // Required. This can refer to a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] in the same project that
-    // was used to create a subordinate [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]. This field
-    // is used for information and usability purposes only. The resource name
-    // is in the format
+    // Required. This can refer to a [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority] that was used to create a
+    // subordinate [CertificateAuthority][google.cloud.security.privateca.v1.CertificateAuthority]. This field is used for information
+    // and usability purposes only. The resource name is in the format
     // `projects/*/locations/*/caPools/*/certificateAuthorities/*`.
     string certificate_authority = 1 [
       (google.api.field_behavior) = REQUIRED,
@@ -786,13 +788,15 @@ message CertificateDescription {
     string hex_serial_number = 3;
 
     // For convenience, the actual lifetime of an issued certificate.
-    // Corresponds to 'not_after_time' - 'not_before_time'.
     google.protobuf.Duration lifetime = 4;
 
     // The time at which the certificate becomes valid.
     google.protobuf.Timestamp not_before_time = 5;
 
-    // The time at which the certificate expires.
+    // The time after which the certificate is expired.
+    // Per RFC 5280, the validity period for a certificate is the period of time
+    // from not_before_time through not_after_time, inclusive.
+    // Corresponds to 'not_before_time' + 'lifetime' - 1 second.
     google.protobuf.Timestamp not_after_time = 6;
   }
 
@@ -855,10 +859,10 @@ message X509Extension {
   // Required. The OID for this X.509 extension.
   ObjectId object_id = 1 [(google.api.field_behavior) = REQUIRED];
 
-  // Required. Indicates whether or not this extension is critical (i.e., if the client
+  // Optional. Indicates whether or not this extension is critical (i.e., if the client
   // does not know how to handle this extension, the client should consider this
   // to be an error).
-  bool critical = 2 [(google.api.field_behavior) = REQUIRED];
+  bool critical = 2 [(google.api.field_behavior) = OPTIONAL];
 
   // Required. The value of this X.509 extension.
   bytes value = 3 [(google.api.field_behavior) = REQUIRED];
@@ -983,6 +987,8 @@ message SubjectAltNames {
   repeated string ip_addresses = 4;
 
   // Contains additional subject alternative name values.
+  // For each custom_san, the `value` field must contain an ASN.1 encoded
+  // UTF8String.
   repeated X509Extension custom_sans = 5;
 }
 
@@ -992,18 +998,17 @@ message CertificateIdentityConstraints {
   // Optional. A CEL expression that may be used to validate the resolved X.509 Subject
   // and/or Subject Alternative Name before a certificate is signed.
   // To see the full allowed syntax and some examples, see
-  // https://cloud.google.com/certificate-authority-service/docs/cel-guide
+  // https://cloud.google.com/certificate-authority-service/docs/using-cel
   google.type.Expr cel_expression = 1 [(google.api.field_behavior) = OPTIONAL];
 
   // Required. If this is true, the [Subject][google.cloud.security.privateca.v1.Subject] field may be copied from a certificate
   // request into the signed certificate. Otherwise, the requested [Subject][google.cloud.security.privateca.v1.Subject]
-  // will be discarded. The bool is optional to indicate an unset field, which suggests a forgotten value that needs to be set by the caller.
+  // will be discarded.
   optional bool allow_subject_passthrough = 2 [(google.api.field_behavior) = REQUIRED];
 
   // Required. If this is true, the [SubjectAltNames][google.cloud.security.privateca.v1.SubjectAltNames] extension may be copied from a
   // certificate request into the signed certificate. Otherwise, the requested
   // [SubjectAltNames][google.cloud.security.privateca.v1.SubjectAltNames] will be discarded.
-  // The bool is optional to indicate an unset field, which suggests a forgotten value that needs to be set by the caller.
   optional bool allow_subject_alt_names_passthrough = 3 [(google.api.field_behavior) = REQUIRED];
 }
 

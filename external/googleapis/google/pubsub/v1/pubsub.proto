@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -196,6 +196,16 @@ message Topic {
   // Reserved for future use. This field is set only in responses from the
   // server; it is ignored if it is set in any requests.
   bool satisfies_pzs = 7;
+
+  // Indicates the minimum duration to retain a message after it is published to
+  // the topic. If this field is set, messages published to the topic in the
+  // last `message_retention_duration` are always available to subscribers. For
+  // instance, it allows any attached subscription to [seek to a
+  // timestamp](https://cloud.google.com/pubsub/docs/replay-overview#seek_to_a_time)
+  // that is up to `message_retention_duration` in the past. If this field is
+  // not set, message retention is controlled by settings on individual
+  // subscriptions. Cannot be more than 7 days or less than 10 minutes.
+  google.protobuf.Duration message_retention_duration = 8;
 }
 
 // A message that is published by publishers and consumed by subscribers. The
@@ -505,6 +515,7 @@ service Subscriber {
     };
     option (google.api.method_signature) =
         "subscription,return_immediately,max_messages";
+    option (google.api.method_signature) = "subscription,max_messages";
   }
 
   // Establishes a stream with the server, which sends messages down to the
@@ -677,8 +688,9 @@ message Subscription {
   // Indicates whether to retain acknowledged messages. If true, then
   // messages are not expunged from the subscription's backlog, even if they are
   // acknowledged, until they fall out of the `message_retention_duration`
-  // window. This must be true if you would like to [Seek to a timestamp]
-  // (https://cloud.google.com/pubsub/docs/replay-overview#seek_to_a_time).
+  // window. This must be true if you would like to [`Seek` to a timestamp]
+  // (https://cloud.google.com/pubsub/docs/replay-overview#seek_to_a_time) in
+  // the past to replay previously-acknowledged messages.
   bool retain_acked_messages = 7;
 
   // How long to retain unacknowledged messages in the subscription's backlog,
@@ -739,6 +751,28 @@ message Subscription {
   // FAILED_PRECONDITION. If the subscription is a push subscription, pushes to
   // the endpoint will not be made.
   bool detached = 15;
+
+  // If true, Pub/Sub provides the following guarantees for the delivery of
+  // a message with a given value of `message_id` on this subscription:
+  //
+  // * The message sent to a subscriber is guaranteed not to be resent
+  // before the message's acknowledgement deadline expires.
+  // * An acknowledged message will not be resent to a subscriber.
+  //
+  // Note that subscribers may still receive multiple copies of a message
+  // when `enable_exactly_once_delivery` is true if the message was published
+  // multiple times by a publisher client. These copies are  considered distinct
+  // by Pub/Sub and have distinct `message_id` values.
+  bool enable_exactly_once_delivery = 16;
+
+  // Output only. Indicates the minimum duration for which a message is retained
+  // after it is published to the subscription's topic. If this field is set,
+  // messages published to the subscription's topic in the last
+  // `topic_message_retention_duration` are always available to subscribers. See
+  // the `message_retention_duration` field in `Topic`. This field is set only
+  // in responses from the server; it is ignored if it is set in any requests.
+  google.protobuf.Duration topic_message_retention_duration = 17
+      [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // A policy that specifies how Cloud Pub/Sub retries message delivery.
@@ -1142,8 +1176,54 @@ message StreamingPullRequest {
 // Response for the `StreamingPull` method. This response is used to stream
 // messages from the server to the client.
 message StreamingPullResponse {
+  // Acknowledgement IDs sent in one or more previous requests to acknowledge a
+  // previously received message.
+  message AcknowledgeConfirmation {
+    // Successfully processed acknowledgement IDs.
+    repeated string ack_ids = 1 [ctype = CORD];
+
+    // List of acknowledgement IDs that were malformed or whose acknowledgement
+    // deadline has expired.
+    repeated string invalid_ack_ids = 2 [ctype = CORD];
+
+    // List of acknowledgement IDs that were out of order.
+    repeated string unordered_ack_ids = 3 [ctype = CORD];
+  }
+
+  // Acknowledgement IDs sent in one or more previous requests to modify the
+  // deadline for a specific message.
+  message ModifyAckDeadlineConfirmation {
+    // Successfully processed acknowledgement IDs.
+    repeated string ack_ids = 1 [ctype = CORD];
+
+    // List of acknowledgement IDs that were malformed or whose acknowledgement
+    // deadline has expired.
+    repeated string invalid_ack_ids = 2 [ctype = CORD];
+  }
+
+  // Subscription properties sent as part of the response.
+  message SubscriptionProperties {
+    // True iff exactly once delivery is enabled for this subscription.
+    bool exactly_once_delivery_enabled = 1;
+    // True iff message ordering is enabled for this subscription.
+    bool message_ordering_enabled = 2;
+  }
+
   // Received Pub/Sub messages. This will not be empty.
   repeated ReceivedMessage received_messages = 1;
+
+  reserved 2;
+
+  // This field will only be set if `enable_exactly_once_delivery` is set to
+  // `true`.
+  AcknowledgeConfirmation acknowledge_confirmation = 5;
+
+  // This field will only be set if `enable_exactly_once_delivery` is set to
+  // `true`.
+  ModifyAckDeadlineConfirmation modify_ack_deadline_confirmation = 3;
+
+  // Properties associated with this subscription.
+  SubscriptionProperties subscription_properties = 4;
 }
 
 // Request for the `CreateSnapshot` method.

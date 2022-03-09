@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,17 +16,20 @@ syntax = "proto3";
 
 package google.cloud.aiplatform.v1beta1;
 
+import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/cloud/aiplatform/v1beta1/feature.proto";
 import "google/cloud/aiplatform/v1beta1/featurestore_monitoring.proto";
 import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
 
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
 option go_package = "google.golang.org/genproto/googleapis/cloud/aiplatform/v1beta1;aiplatform";
 option java_multiple_files = true;
 option java_outer_classname = "EntityTypeProto";
 option java_package = "com.google.cloud.aiplatform.v1beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
 
 // An entity type is a type of object in a system that needs to be modeled and
 // have stored information about. For example, driver is an entity type, and
@@ -73,7 +76,8 @@ message EntityType {
   // "overwrite" update happens.
   string etag = 7 [(google.api.field_behavior) = OPTIONAL];
 
-  // Optional. The default monitoring configuration for all Features under this
+  // Optional. The default monitoring configuration for all Features with value type
+  // ([Feature.ValueType][google.cloud.aiplatform.v1beta1.Feature.ValueType]) BOOL, STRING, DOUBLE or INT64 under this
   // EntityType.
   //
   // If this is populated with
