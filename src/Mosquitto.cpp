@@ -134,7 +134,7 @@ void Mosquitto::connect(const string& address, int port, int alive_delay,
             }
         }
         else {
-            // cout << "Connection established!" << endl;
+            BOOST_LOG_TRIVIAL(info) << "Connection to Mosquitto broker established!";
             this->running = true;
         }
     }

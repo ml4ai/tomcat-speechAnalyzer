@@ -43,7 +43,7 @@ void SpeechWrapper::finish_stream() {
     status = streamer->Finish();
     if (!status.ok()) {
         // Report the RPC failure.
-        cerr << status.error_message() << endl;
+        BOOST_LOG_TRIVIAL(error) << status.error_message();
     }
 }
 
