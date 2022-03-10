@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ syntax = "proto3";
 
 package google.cloud.aiplatform.v1beta1;
 
+import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/api/resource.proto";
 import "google/cloud/aiplatform/v1beta1/dataset.proto";
@@ -23,14 +24,17 @@ import "google/cloud/aiplatform/v1beta1/deployed_model_ref.proto";
 import "google/cloud/aiplatform/v1beta1/encryption_spec.proto";
 import "google/cloud/aiplatform/v1beta1/env_var.proto";
 import "google/cloud/aiplatform/v1beta1/explanation.proto";
+
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
-import "google/api/annotations.proto";
 
+option csharp_namespace = "Google.Cloud.AIPlatform.V1Beta1";
 option go_package = "google.golang.org/genproto/googleapis/cloud/aiplatform/v1beta1;aiplatform";
 option java_multiple_files = true;
 option java_outer_classname = "ModelProto";
 option java_package = "com.google.cloud.aiplatform.v1beta1";
+option php_namespace = "Google\\Cloud\\AIPlatform\\V1beta1";
+option ruby_package = "Google::Cloud::AIPlatform::V1beta1";
 
 // A trained machine learning Model.
 message Model {
@@ -136,7 +140,8 @@ message Model {
   // not available for export.
   repeated ExportFormat supported_export_formats = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
 
-  // Output only. The resource name of the TrainingPipeline that uploaded this Model, if any.
+  // Output only. The resource name of the TrainingPipeline that uploaded this Model, if
+  // any.
   string training_pipeline = 7 [
     (google.api.field_behavior) = OUTPUT_ONLY,
     (google.api.resource_reference) = {
@@ -339,13 +344,13 @@ message PredictSchemata {
 
 // Specification of a container for serving predictions. Some fields in this
 // message correspond to fields in the [Kubernetes Container v1 core
-// specification](https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core).
+// specification](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#container-v1-core).
 message ModelContainerSpec {
   // Required. Immutable. URI of the Docker image to be used as the custom container for serving
   // predictions. This URI must identify an image in Artifact Registry or
   // Container Registry. Learn more about the [container publishing
   // requirements](https://cloud.google.com/vertex-ai/docs/predictions/custom-container-requirements#publishing),
-  // including permissions requirements for the AI Platform Service Agent.
+  // including permissions requirements for the Vertex AI Service Agent.
   //
   // The container image is ingested upon [ModelService.UploadModel][google.cloud.aiplatform.v1beta1.ModelService.UploadModel], stored
   // internally, and this original path is afterwards not used.
@@ -397,7 +402,7 @@ message ModelContainerSpec {
   // <code>$$(<var>VARIABLE_NAME</var>)</code>
   // This field corresponds to the `command` field of the Kubernetes Containers
   // [v1 core
-  // API](https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core).
+  // API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#container-v1-core).
   repeated string command = 2 [(google.api.field_behavior) = IMMUTABLE];
 
   // Immutable. Specifies arguments for the command that runs when the container starts.
@@ -435,7 +440,7 @@ message ModelContainerSpec {
   // <code>$$(<var>VARIABLE_NAME</var>)</code>
   // This field corresponds to the `args` field of the Kubernetes Containers
   // [v1 core
-  // API](https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core).
+  // API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#container-v1-core).
   repeated string args = 3 [(google.api.field_behavior) = IMMUTABLE];
 
   // Immutable. List of environment variables to set in the container. After the container
@@ -465,12 +470,12 @@ message ModelContainerSpec {
   //
   // This field corresponds to the `env` field of the Kubernetes Containers
   // [v1 core
-  // API](https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core).
+  // API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#container-v1-core).
   repeated EnvVar env = 4 [(google.api.field_behavior) = IMMUTABLE];
 
   // Immutable. List of ports to expose from the container. Vertex AI sends any
-  // prediction requests that it receives to the first port on this list. AI
-  // Platform also sends
+  // prediction requests that it receives to the first port on this list. Vertex
+  // AI also sends
   // [liveness and health
   // checks](https://cloud.google.com/vertex-ai/docs/predictions/custom-container-requirements#liveness)
   // to this port.
@@ -488,7 +493,7 @@ message ModelContainerSpec {
   // Vertex AI does not use ports other than the first one listed. This field
   // corresponds to the `ports` field of the Kubernetes Containers
   // [v1 core
-  // API](https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#container-v1-core).
+  // API](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.23/#container-v1-core).
   repeated Port ports = 5 [(google.api.field_behavior) = IMMUTABLE];
 
   // Immutable. HTTP path on the container to send prediction requests to. Vertex AI

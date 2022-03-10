@@ -14,6 +14,8 @@
 #include <iostream>
 #include <thread>
 
+#include <boost/log/trivial.hpp>
+
 #include "GlobalMosquittoListener.h"
 #include "util.h"
 
@@ -25,7 +27,7 @@ using namespace std;
 
 // Report a failure
 void fail(beast::error_code ec, char const* what) {
-    cerr << what << ": " << ec.message() << "\n";
+    BOOST_LOG_TRIVIAL(error) << what << ": " << ec.message() << "\n";
 }
 
 // Callback function for openSMILE messages
@@ -55,7 +57,7 @@ void process_responses(
                                         // Generate UUID4 for messages
         string id = boost::uuids::to_string(boost::uuids::random_generator()());
         // Process messages
-        thread{[=] { builder->process_asr_message(response, id); }}.detach();
-        // builder->process_asr_message(response, id);
+        // thread{[=] { builder->process_asr_message(response, id); }}.detach();
+        builder->process_asr_message(response, id);
     }
 }
