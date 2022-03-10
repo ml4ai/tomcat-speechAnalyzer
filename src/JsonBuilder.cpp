@@ -125,15 +125,24 @@ void JsonBuilder::process_message(string message) {
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
-    try {
         nlohmann::json message;
         message["header"] = create_common_header("observation");
         message["msg"] = create_common_msg("asr:transcription");
+	
+	// Check results and alternatives size 
+	if(response.results_size() == 0 || response.results(0).alternatives_size() == 0){
+		return;
+	}
+	
+	message["data"]["text"] = response.results(0).alternatives(0).transcript(); 
+	message["data"]["is_final"] = response.results(0).is_final();
 
-        message["data"]["text"] =
-            response.results(0).alternatives(0).transcript();
-        message["data"]["is_final"] = response.results(0).is_final();
-        message["data"]["asr_system"] = "google";
+	// Check that text isn't empty if is_final is true
+	if(response.results(0).alternatives(0).words_size() == 0 && message["data"]["is_final"]){
+		return;
+	}	
+
+	message["data"]["asr_system"] = "google";
         message["data"]["participant_id"] = this->participant_id;
         message["data"]["id"] = id;
 
@@ -165,6 +174,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
         else {
             // Add transcription alternatvie
             vector<nlohmann::json> alternatives;
+	   
             auto result = response.results(0);
             for (int i = 0; i < result.alternatives_size(); i++) {
                 auto alternative = result.alternatives(i);
@@ -178,12 +188,11 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
             auto utt = result.alternatives(0);
             WordInfo f = utt.words(0);
             WordInfo l = utt.words(utt.words().size() - 1);
-
+	    
             int64_t start_seconds = f.start_time().seconds();
             int32_t start_nanos = f.start_time().nanos();
             int64_t end_seconds = l.start_time().seconds();
             int32_t end_nanos = l.start_time().nanos();
-
             boost::posix_time::ptime start_timestamp =
                 this->stream_start_time +
                 boost::posix_time::seconds(start_seconds) +
@@ -213,9 +222,6 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 
             this->is_initial = true;
         }
-    }
-    catch (std::exception const& e) {
-    }
 }
 
 // Data for handling vosk asr messages
@@ -333,10 +339,9 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
     message["data"]["time_interval"] = 0.01;
     vector<nlohmann::json> word_messages;
     auto result = response.results(0);
-    for (int i = 0; i < result.alternatives_size(); i++) {
-        auto alternative = result.alternatives(i);
+	auto alternative = result.alternatives(0);
         for (WordInfo word : alternative.words()) {
-            int64_t start_seconds = word.start_time().seconds();
+	    int64_t start_seconds = word.start_time().seconds();
             int32_t start_nanos = word.start_time().nanos();
             int64_t end_seconds = word.end_time().seconds();
             int32_t end_nanos = word.end_time().nanos();
@@ -375,7 +380,6 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
             word_message["features"] = features_output.dump();
             word_messages.push_back(word_message);
         }
-    }
     message["data"]["word_messages"] = word_messages;
     return message.dump();
 }
