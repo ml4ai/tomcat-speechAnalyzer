@@ -9,6 +9,12 @@ pushd opensmile
     mkdir build
     cd build
     cmake ..
-    make -j
-    make -j install
+    if [[ $OSTYPE == "linux-gnu" ]]; then
+        NJOBS=$(nproc)
+    else
+        NJOBS=$(sysctl -n hw.ncpu)
+    fi
+
+    make -j $NJOBS
+    make -j $NJOBS install
 popd
