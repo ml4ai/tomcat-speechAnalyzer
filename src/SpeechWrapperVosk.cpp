@@ -8,6 +8,7 @@
 #include "JsonBuilder.h"
 #include <nlohmann/json.hpp>
 
+#include <boost/log/trivial.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/beast/core.hpp>
@@ -74,10 +75,7 @@ void SpeechWrapperVosk::initialize_stream() {
                 this->builder->process_asr_message_vosk(response);
             }
             catch (std::exception const& e) {
-                std::cout << "Error recieving result from vosk server"
-                          << std::endl;
-                std::cout << "Error was: " << e.what() << std::endl;
-
+                BOOST_LOG_TRIVIAL(error) << "Error recieving result from vosk server: " << e.what();
                 this->running = false;
             }
         }

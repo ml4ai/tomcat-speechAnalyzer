@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <boost/log/trivial.hpp>
+
 #include "GlobalMosquittoListener.h"
 #include "JsonBuilder.h"
 #include "util.h"
@@ -39,14 +41,14 @@ OpensmileClient::OpensmileClient(int socket_port, JsonBuilder* builder) {
 
     // Start socket client
     if ((this->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        std::cout << "socket_error" << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "socket_error";
     }
 
     this->serv_addr.sin_family = AF_INET;
     this->serv_addr.sin_port = htons(this->socket_port);
 
     if (inet_pton(AF_INET, "127.0.0.1", &this->serv_addr.sin_addr) <= 0) {
-        std::cout << "Address error" << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Address error";
     }
 
     while (connect(this->sock,
@@ -88,7 +90,7 @@ OpensmileServer::OpensmileServer(int socket_port) {
 
     // Start socket server
     if ((this->server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-        std::cout << "socket_error" << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "socket_error";
     }
 
     if (setsockopt(this->server_fd,
@@ -96,7 +98,7 @@ OpensmileServer::OpensmileServer(int socket_port) {
                    SO_REUSEADDR | SO_REUSEPORT,
                    &this->opt,
                    sizeof(this->opt))) {
-        std::cout << "setsockopt" << std::endl;
+        BOOST_LOG_TRIVIAL(info) << "setsockopt";
     }
 
     this->address.sin_family = AF_INET;
@@ -106,17 +108,17 @@ OpensmileServer::OpensmileServer(int socket_port) {
     if (::bind(this->server_fd,
                (struct sockaddr*)&this->address,
                sizeof(this->address)) < 0) {
-        std::cout << "bind" << std::endl;
+        BOOST_LOG_TRIVIAL(info) << "bind";
     }
 
     if (listen(this->server_fd, 3) < 0) {
-        std::cout << "listen" << std::endl;
+        BOOST_LOG_TRIVIAL(info) << "listen";
     }
 
     if ((this->new_socket = accept(this->server_fd,
                                    (struct sockaddr*)&this->address,
                                    (socklen_t*)&this->addrlen)) < 0) {
-        std::cout << "accept" << std::endl;
+        BOOST_LOG_TRIVIAL(info) << "accept";
     }
 
     // Initialize Opensmile

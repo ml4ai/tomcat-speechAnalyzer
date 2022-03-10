@@ -124,13 +124,17 @@ void Mosquitto::connect(const string& address, int port, int alive_delay,
         if (error_code != MOSQ_ERR_SUCCESS) {
             trials--;
             if (trials > 0) {
-                cout << "Fail! Waiting to retry once more..." << endl;
+                BOOST_LOG_TRIVIAL(info)
+                    << "Failed to connect to Mosquitto broker "
+                    << "at " << address << ":" << port << "! Retrying in "
+                    << milliseconds_before_retrial << " milliseconds...";
+
                 this_thread::sleep_for(
                     chrono::milliseconds(milliseconds_before_retrial));
             }
         }
         else {
-            // cout << "Connection established!" << endl;
+            BOOST_LOG_TRIVIAL(info) << "Connection to Mosquitto broker established!";
             this->running = true;
         }
     }

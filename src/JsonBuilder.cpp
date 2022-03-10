@@ -4,8 +4,8 @@
 #include "arguments.h"
 #include "base64.h"
 
-//#include "google/cloud/speech/v1p1beta1/cloud_speech.grpc.pb.h"
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
+#include <boost/log/trivial.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -37,7 +37,7 @@ using google::cloud::speech::v1::WordInfo;
 using namespace std;
 
 JsonBuilder::JsonBuilder() {
-    
+
 }
 
 JsonBuilder::~JsonBuilder() {
@@ -53,7 +53,7 @@ void JsonBuilder::Initialize(){
     // Listen for trial id and experiment id
     this->listener_client.subscribe("trial");
     this->listener_client.subscribe("experiment");
-    this->listener_client.set_max_seconds_without_messages(10000); 
+    this->listener_client.set_max_seconds_without_messages(10000);
     this->listener_client_thread = thread([this] { listener_client.loop(); });
 
     // Set the start time for the stream
@@ -319,10 +319,8 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
         }
     }
     catch (std::exception const& e) {
-        std::cout << "Error processing Vosk message" << std::endl;
-        std::cout << "Error was: " << e.what() << std::endl;
-        std::cout << "Message was:" << std::endl;
-        std::cout << response << std::endl;
+        BOOST_LOG_TRIVIAL(error) << "Error processing Vosk message: " << e.what();
+        BOOST_LOG_TRIVIAL(error) << "The Vosk message was: " << response;
     }
 }
 
@@ -496,7 +494,7 @@ string JsonBuilder::process_mmc_message(string message) {
         return res.body().data();
     }
     catch (std::exception const& e) {
-        std::cerr << e.what() << std::endl;
+        BOOST_LOG_TRIVIAL(error) << e.what();
     }
     return "";
 }
@@ -546,8 +544,8 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
         float time = opensmile_history[i]["data"]["tmeta"]["time"];
         if (time > start_time && time < end_time) {
             out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
-            std::cout << opensmile_history[i]["data"]["features"]["lld"].dump()
-                      << std::endl;
+            BOOST_LOG_TRIVIAL(info) << opensmile_history[i]["data"]["features"]["lld"].dump()
+                     ;
         }
     }
     this->opensmile_history.clear();

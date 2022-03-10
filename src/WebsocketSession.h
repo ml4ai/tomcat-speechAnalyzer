@@ -48,7 +48,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     boost::lockfree::spsc_queue<std::vector<char>,
                                 boost::lockfree::capacity<8096>>
         spsc_queue;
-    
+
     // Static objects
     static Arguments args;
     static int socket_port;
@@ -57,19 +57,19 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     // Session objects
     JsonBuilder* builder;
     SpeechWrapper* speech_handler;
-    SpeechWrapperVosk* speech_handler_vosk; 
+    SpeechWrapperVosk* speech_handler_vosk;
     OpensmileSession* opensmile_session;
 
     // Threads
     std::thread consumer_thread;
     std::thread asr_reader_thread;
-    
-    // Default sample data 
+
+    // Default sample data
     int increment = 0;
     int samples_done = 0;
     int sample_rate = 48000;
     int samples_per_chunk = 4096;
-   
+
     // Flags
     bool is_float = false;
     bool is_int16 = true;
@@ -110,13 +110,13 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
 
-	
+
         this->participant_id = params["id"];
 
         BOOST_LOG_TRIVIAL(info)
             << "Accepted connection: participant_id = " << params["id"]
             << " sample_rate = " << params["sampleRate"];
-	
+
         // Set a decorator to change the server of the handshake
         this->ws_.set_option(
             ws::stream_base::decorator([](ws::response_type& res) {
@@ -179,19 +179,19 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     void shutdown(){
         // Cleanup subsystems
         if (!this->args.disable_asr_google) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Google speech session"; 
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Google speech session";
             this->speech_handler->send_writes_done();
             this->asr_reader_thread.join();
             this->speech_handler->finish_stream();
         }
 
         if (!this->args.disable_asr_vosk) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Vosk speech session"; 
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Vosk speech session";
             this->speech_handler_vosk->send_writes_done();
             this->speech_handler_vosk->end_stream();
         }
         if (!this->args.disable_opensmile) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Opensmile session"; 
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Opensmile session";
             this->opensmile_session->send_eoi();
         }
 
@@ -267,7 +267,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
     void on_accept(beast::error_code ec) {
         if (ec) {
-	    std::cout << "FAIL " <<std::endl;
+            BOOST_LOG_TRIVIAL(info) << "FAIL ";
             return fail(ec, "accept");
         }
 
@@ -316,7 +316,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                 count++;
             }
             if (count > 0) {
-                std::cout << count << std::endl;
+                BOOST_LOG_TRIVIAL(info) << count;
             }
             // Send chunk for raw audio message
             string id = to_string(this->increment);
