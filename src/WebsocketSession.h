@@ -1,3 +1,6 @@
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
@@ -5,17 +8,14 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/algorithm/string/erase.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 
-#include <stdlib.h>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <mutex>
 #include <stdio.h>
+#include <stdlib.h>
 #include <thread>
 
 #include "JsonBuilder.h"
@@ -41,7 +41,7 @@ using tcp = boost::asio::ip::tcp; // from <boost/asio/ip/tcp.hpp>
 using namespace boost::chrono;
 
 class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
-    public:
+  public:
     // Websocket base
     ws::stream<beast::tcp_stream> ws_;
     beast::flat_buffer buffer_;
@@ -52,7 +52,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     // Static objects
     static Arguments args;
     static int socket_port;
-    static std::mutex *socket_mutex;
+    static std::mutex* socket_mutex;
 
     // Session objects
     JsonBuilder* builder;
@@ -81,25 +81,21 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     process_real_cpu_clock::time_point stream_start;
     std::string participant_id;
 
-
-
     // Take ownership of the socket
     explicit WebsocketSession(tcp::socket&& socket) : ws_(move(socket)) {}
 
     // Start the asynchronous accept operation
     template <class Body, class Allocator>
     void do_accept(http::request<Body, http::basic_fields<Allocator>> request) {
-	using boost::split, boost::is_any_of, boost::erase_head;
+        using boost::split, boost::is_any_of, boost::erase_head;
 
         std::map<std::string, std::string> params;
 
-
         std::string request_target = std::string(request.target());
-            erase_head(request_target, 2);
+        erase_head(request_target, 2);
 
         std::vector<std::string> param_strings;
         split(param_strings, request_target, is_any_of("&"));
-
 
         for (auto param_string : param_strings) {
             std::vector<std::string> key_value_pair;
@@ -109,7 +105,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         this->participant_id = params["id"];
         this->sample_rate = stoi(params["sampleRate"]);
-
 
         this->participant_id = params["id"];
 
@@ -134,24 +129,26 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
   private:
     void initialize() {
-	this->socket_mutex->lock();
-	// Initialize JsonBuilder
-        BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Initializing JsonBuilder";
-	this->builder = new JsonBuilder();
-	this->builder->participant_id = this->participant_id;
-	this->builder->Initialize();
+        this->socket_mutex->lock();
+        // Initialize JsonBuilder
+        BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                << "Initializing JsonBuilder";
+        this->builder = new JsonBuilder();
+        this->builder->participant_id = this->participant_id;
+        this->builder->Initialize();
 
         // Initialize openSMILE
         if (!this->args.disable_opensmile) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Initializing Opensmile";
-	    int p = this->socket_port;
-	    this->socket_port++;
-            this->opensmile_session =
-                new OpensmileSession(p, this->builder);
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Initializing Opensmile";
+            int p = this->socket_port;
+            this->socket_port++;
+            this->opensmile_session = new OpensmileSession(p, this->builder);
         }
         // Initialize Google Speech Session
         if (!this->args.disable_asr_google) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Initializing Google Speech  system";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Initializing Google Speech  system";
             this->speech_handler = new SpeechWrapper(false, this->sample_rate);
             this->speech_handler->start_stream();
             this->stream_start = process_real_cpu_clock::now();
@@ -164,38 +161,43 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
         }
         // Initialize Vosk Speech session
         if (!this->args.disable_asr_vosk) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Initializing Vosk Speech  system";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Initializing Vosk Speech  system";
             this->speech_handler_vosk =
                 new SpeechWrapperVosk(this->sample_rate, this->builder);
             this->speech_handler_vosk->start_stream();
         };
 
-        BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Starting write_thread";
+        BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                << "Starting write_thread";
         this->consumer_thread = std::thread([this] { this->write_thread(); });
         this->is_initialized = true;
-	this->socket_mutex->unlock();
+        this->socket_mutex->unlock();
     }
 
-    void shutdown(){
+    void shutdown() {
         // Cleanup subsystems
         if (!this->args.disable_asr_google) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Google speech session";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Closing Google speech session";
             this->speech_handler->send_writes_done();
             this->asr_reader_thread.join();
             this->speech_handler->finish_stream();
         }
 
         if (!this->args.disable_asr_vosk) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Vosk speech session";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Closing Vosk speech session";
             this->speech_handler_vosk->send_writes_done();
             this->speech_handler_vosk->end_stream();
         }
         if (!this->args.disable_opensmile) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Closing Opensmile session";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Closing Opensmile session";
             this->opensmile_session->send_eoi();
         }
 
-	this->builder->Shutdown();
+        this->builder->Shutdown();
     }
 
     void write_thread() {
@@ -284,17 +286,20 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
                                           this->shared_from_this()));
         }
         else {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Joining write thread";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Joining write thread";
             this->consumer_thread.join();
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "<< "Shutting down subsystems";
-	    this->shutdown();
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Shutting down subsystems";
+            this->shutdown();
         }
     }
 
     void on_read(beast::error_code ec, size_t bytes_transferred) {
-	boost::ignore_unused(bytes_transferred);
+        boost::ignore_unused(bytes_transferred);
         if (ec) {
-            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Connection has been closed";
+            BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                    << "Connection has been closed";
             this->read_done = true;
         }
 
@@ -334,7 +339,8 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
             // Initialize write_thread
             if (!this->is_initialized) {
                 this->initialize();
-                BOOST_LOG_TRIVIAL(info) << this->participant_id << ": " << "Begin reading chunks";
+                BOOST_LOG_TRIVIAL(info) << this->participant_id << ": "
+                                        << "Begin reading chunks";
             }
         }
         // Do another read

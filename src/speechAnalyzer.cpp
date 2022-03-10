@@ -77,7 +77,7 @@ void write_thread(
 Arguments JsonBuilder::args;
 Arguments WebsocketSession::args;
 int WebsocketSession::socket_port;
-std::mutex *WebsocketSession::socket_mutex;
+std::mutex* WebsocketSession::socket_mutex;
 
 int main(int argc, char* argv[]) {
 

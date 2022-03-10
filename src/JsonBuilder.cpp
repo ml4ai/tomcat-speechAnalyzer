@@ -5,8 +5,8 @@
 #include "base64.h"
 
 #include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
-#include <boost/log/trivial.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/trivial.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -36,14 +36,11 @@ using google::cloud::speech::v1::StreamingRecognizeResponse;
 using google::cloud::speech::v1::WordInfo;
 using namespace std;
 
-JsonBuilder::JsonBuilder() {
+JsonBuilder::JsonBuilder() {}
 
-}
+JsonBuilder::~JsonBuilder() {}
 
-JsonBuilder::~JsonBuilder() {
-}
-
-void JsonBuilder::Initialize(){
+void JsonBuilder::Initialize() {
     // Setup connection with mosquitto broker
     this->mosquitto_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
@@ -68,7 +65,7 @@ void JsonBuilder::Initialize(){
     this->postgres.participant_id = this->participant_id;
 }
 
-void JsonBuilder::Shutdown(){
+void JsonBuilder::Shutdown() {
     // Close connection with mosquitto broker
     this->mosquitto_client.close();
     this->listener_client.close();
@@ -125,103 +122,101 @@ void JsonBuilder::process_message(string message) {
 // Data for handling google asr messages
 void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
                                       string id) {
-        nlohmann::json message;
-        message["header"] = create_common_header("observation");
-        message["msg"] = create_common_msg("asr:transcription");
-	
-	// Check results and alternatives size 
-	if(response.results_size() == 0 || response.results(0).alternatives_size() == 0){
-		return;
-	}
-	
-	message["data"]["text"] = response.results(0).alternatives(0).transcript(); 
-	message["data"]["is_final"] = response.results(0).is_final();
+    nlohmann::json message;
+    message["header"] = create_common_header("observation");
+    message["msg"] = create_common_msg("asr:transcription");
 
-	// Check that text isn't empty if is_final is true
-	if(response.results(0).alternatives(0).words_size() == 0 && message["data"]["is_final"]){
-		return;
-	}	
+    // Check results and alternatives size
+    if (response.results_size() == 0 ||
+        response.results(0).alternatives_size() == 0) {
+        return;
+    }
 
-	message["data"]["asr_system"] = "google";
-        message["data"]["participant_id"] = this->participant_id;
-        message["data"]["id"] = id;
+    message["data"]["text"] = response.results(0).alternatives(0).transcript();
+    message["data"]["is_final"] = response.results(0).is_final();
 
-        if (!message["data"]["is_final"]) {
+    // Check that text isn't empty if is_final is true
+    if (response.results(0).alternatives(0).words_size() == 0 &&
+        message["data"]["is_final"]) {
+        return;
+    }
 
-            // Handle is_initial field
-            if (this->is_initial) {
-                message["data"]["is_initial"] = true;
-                this->utterance_start_timestamp =
-                    boost::posix_time::to_iso_extended_string(
-                        boost::posix_time::microsec_clock::universal_time()) +
-                    "Z";
-                this->is_initial = false;
-            }
-            else {
-                // Stop processing if only publishig first intermediate
-                return;
-                message["data"]["is_initial"] = false;
-            }
+    message["data"]["asr_system"] = "google";
+    message["data"]["participant_id"] = this->participant_id;
+    message["data"]["id"] = id;
 
-            // Add start timestamp
-            message["data"]["start_timestamp"] =
-                this->utterance_start_timestamp;
+    if (!message["data"]["is_final"]) {
 
-            // Publish message
-            this->mosquitto_client.publish("agent/asr/intermediate",
-                                           message.dump());
+        // Handle is_initial field
+        if (this->is_initial) {
+            message["data"]["is_initial"] = true;
+            this->utterance_start_timestamp =
+                boost::posix_time::to_iso_extended_string(
+                    boost::posix_time::microsec_clock::universal_time()) +
+                "Z";
+            this->is_initial = false;
         }
         else {
-            // Add transcription alternatvie
-            vector<nlohmann::json> alternatives;
-	   
-            auto result = response.results(0);
-            for (int i = 0; i < result.alternatives_size(); i++) {
-                auto alternative = result.alternatives(i);
-                alternatives.push_back(nlohmann::json::object(
-                    {{"text", alternative.transcript()},
-                     {"confidence", alternative.confidence()}}));
-            }
-            message["data"]["alternatives"] = alternatives;
-
-            // Calculate timestamps
-            auto utt = result.alternatives(0);
-            WordInfo f = utt.words(0);
-            WordInfo l = utt.words(utt.words().size() - 1);
-	    
-            int64_t start_seconds = f.start_time().seconds();
-            int32_t start_nanos = f.start_time().nanos();
-            int64_t end_seconds = l.start_time().seconds();
-            int32_t end_nanos = l.start_time().nanos();
-            boost::posix_time::ptime start_timestamp =
-                this->stream_start_time +
-                boost::posix_time::seconds(start_seconds) +
-                boost::posix_time::nanoseconds(start_nanos);
-            boost::posix_time::ptime end_timestamp =
-                this->stream_start_time +
-                boost::posix_time::seconds(end_seconds) +
-                boost::posix_time::nanoseconds(end_nanos);
-
-            message["data"]["start_timestamp"] =
-                boost::posix_time::to_iso_extended_string(start_timestamp) +
-                "Z";
-            message["data"]["end_timestamp"] =
-                boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
-
-            // Add sentiment data
-            string features = this->process_alignment_message(response, id);
-            string mmc = this->process_mmc_message(features);
-            message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-            this->strip_mmc_message(message);
-            message["data"]["features"] =
-                nlohmann::json::parse(features)["data"];
-            this->strip_features_message(message);
-
-            // Publish message
-            this->mosquitto_client.publish("agent/asr/final", message.dump());
-
-            this->is_initial = true;
+            // Stop processing if only publishig first intermediate
+            return;
+            message["data"]["is_initial"] = false;
         }
+
+        // Add start timestamp
+        message["data"]["start_timestamp"] = this->utterance_start_timestamp;
+
+        // Publish message
+        this->mosquitto_client.publish("agent/asr/intermediate",
+                                       message.dump());
+    }
+    else {
+        // Add transcription alternatvie
+        vector<nlohmann::json> alternatives;
+
+        auto result = response.results(0);
+        for (int i = 0; i < result.alternatives_size(); i++) {
+            auto alternative = result.alternatives(i);
+            alternatives.push_back(nlohmann::json::object(
+                {{"text", alternative.transcript()},
+                 {"confidence", alternative.confidence()}}));
+        }
+        message["data"]["alternatives"] = alternatives;
+
+        // Calculate timestamps
+        auto utt = result.alternatives(0);
+        WordInfo f = utt.words(0);
+        WordInfo l = utt.words(utt.words().size() - 1);
+
+        int64_t start_seconds = f.start_time().seconds();
+        int32_t start_nanos = f.start_time().nanos();
+        int64_t end_seconds = l.start_time().seconds();
+        int32_t end_nanos = l.start_time().nanos();
+        boost::posix_time::ptime start_timestamp =
+            this->stream_start_time +
+            boost::posix_time::seconds(start_seconds) +
+            boost::posix_time::nanoseconds(start_nanos);
+        boost::posix_time::ptime end_timestamp =
+            this->stream_start_time + boost::posix_time::seconds(end_seconds) +
+            boost::posix_time::nanoseconds(end_nanos);
+
+        message["data"]["start_timestamp"] =
+            boost::posix_time::to_iso_extended_string(start_timestamp) + "Z";
+        message["data"]["end_timestamp"] =
+            boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
+
+        // Add sentiment data
+        string features = this->process_alignment_message(response, id);
+        string mmc = this->process_mmc_message(features);
+        message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+        this->strip_mmc_message(message);
+        message["data"]["features"] = nlohmann::json::parse(features)["data"];
+        this->strip_features_message(message);
+
+        // Publish message
+        this->mosquitto_client.publish("agent/asr/final", message.dump());
+
+        this->is_initial = true;
+    }
 }
 
 // Data for handling vosk asr messages
@@ -319,7 +314,8 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
         }
     }
     catch (std::exception const& e) {
-        BOOST_LOG_TRIVIAL(error) << "Error processing Vosk message: " << e.what();
+        BOOST_LOG_TRIVIAL(error)
+            << "Error processing Vosk message: " << e.what();
         BOOST_LOG_TRIVIAL(error) << "The Vosk message was: " << response;
     }
 }
@@ -337,47 +333,47 @@ JsonBuilder::process_alignment_message(StreamingRecognizeResponse response,
     message["data"]["time_interval"] = 0.01;
     vector<nlohmann::json> word_messages;
     auto result = response.results(0);
-	auto alternative = result.alternatives(0);
-        for (WordInfo word : alternative.words()) {
-	    int64_t start_seconds = word.start_time().seconds();
-            int32_t start_nanos = word.start_time().nanos();
-            int64_t end_seconds = word.end_time().seconds();
-            int32_t end_nanos = word.end_time().nanos();
+    auto alternative = result.alternatives(0);
+    for (WordInfo word : alternative.words()) {
+        int64_t start_seconds = word.start_time().seconds();
+        int32_t start_nanos = word.start_time().nanos();
+        int64_t end_seconds = word.end_time().seconds();
+        int32_t end_nanos = word.end_time().nanos();
 
-            double start_time =
-                this->sync_time + start_seconds + (start_nanos / 1000000000.0);
-            double end_time =
-                this->sync_time + end_seconds + (end_nanos / 1000000000.0);
-            string current_word = word.word();
-            // Get extracted features message history
-            vector<nlohmann::json> history =
-                this->postgres.features_between(start_time, end_time);
-            // Initialize the features output by creating a vector for each
-            // feature
-            nlohmann::json word_message;
-            nlohmann::json features_output;
-            if (history.size() == 0) {
-                features_output = nullptr;
-                word_message["features"] = nullptr;
-            }
-            else {
-                for (auto& it : history[0].items()) {
-                    features_output[it.key()] = vector<double>();
-                }
-                // Load the features output from the history entries
-                for (auto entry : history) {
-                    for (auto& it : history[0].items()) {
-                        features_output[it.key()].push_back(entry[it.key()]);
-                    }
-                }
-                word_message["features"] = features_output.dump();
-            }
-            word_message["word"] = current_word;
-            word_message["start_time"] = start_time;
-            word_message["end_time"] = end_time;
-            word_message["features"] = features_output.dump();
-            word_messages.push_back(word_message);
+        double start_time =
+            this->sync_time + start_seconds + (start_nanos / 1000000000.0);
+        double end_time =
+            this->sync_time + end_seconds + (end_nanos / 1000000000.0);
+        string current_word = word.word();
+        // Get extracted features message history
+        vector<nlohmann::json> history =
+            this->postgres.features_between(start_time, end_time);
+        // Initialize the features output by creating a vector for each
+        // feature
+        nlohmann::json word_message;
+        nlohmann::json features_output;
+        if (history.size() == 0) {
+            features_output = nullptr;
+            word_message["features"] = nullptr;
         }
+        else {
+            for (auto& it : history[0].items()) {
+                features_output[it.key()] = vector<double>();
+            }
+            // Load the features output from the history entries
+            for (auto entry : history) {
+                for (auto& it : history[0].items()) {
+                    features_output[it.key()].push_back(entry[it.key()]);
+                }
+            }
+            word_message["features"] = features_output.dump();
+        }
+        word_message["word"] = current_word;
+        word_message["start_time"] = start_time;
+        word_message["end_time"] = end_time;
+        word_message["features"] = features_output.dump();
+        word_messages.push_back(word_message);
+    }
     message["data"]["word_messages"] = word_messages;
     return message.dump();
 }
@@ -544,8 +540,8 @@ vector<nlohmann::json> JsonBuilder::features_between(double start_time,
         float time = opensmile_history[i]["data"]["tmeta"]["time"];
         if (time > start_time && time < end_time) {
             out.push_back(opensmile_history[i]["data"]["features"]["lld"]);
-            BOOST_LOG_TRIVIAL(info) << opensmile_history[i]["data"]["features"]["lld"].dump()
-                     ;
+            BOOST_LOG_TRIVIAL(info)
+                << opensmile_history[i]["data"]["features"]["lld"].dump();
         }
     }
     this->opensmile_history.clear();

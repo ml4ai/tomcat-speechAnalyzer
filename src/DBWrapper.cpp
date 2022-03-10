@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include <boost/log/trivial.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/trivial.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -52,7 +52,7 @@ void DBWrapper::shutdown() {
         this->thread_pool[i].join();
         PQfinish(this->connection_pool[i]);
     }
-    //BOOST_LOG_TRIVIAL(error) << "Shutdown DB connections";
+    // BOOST_LOG_TRIVIAL(error) << "Shutdown DB connections";
 }
 
 PGconn* DBWrapper::get_connection() {
@@ -150,7 +150,8 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     // Create connection
     conn = PQconnectdb(this->connection_string.c_str());
     if (PQstatus(conn) != CONNECTION_OK) {
-        BOOST_LOG_TRIVIAL(error) << "Connection error: " << PQerrorMessage(conn);
+        BOOST_LOG_TRIVIAL(error)
+            << "Connection error: " << PQerrorMessage(conn);
     }
 
     // Get features from database

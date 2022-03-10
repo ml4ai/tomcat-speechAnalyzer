@@ -14,8 +14,8 @@ class SpeechWrapper {
 
     // Speech Session state variables
     std::unique_ptr<grpc::ClientReaderWriterInterface<
-       google::cloud::speech::v1::StreamingRecognizeRequest,
-       google::cloud::speech::v1::StreamingRecognizeResponse>>
+        google::cloud::speech::v1::StreamingRecognizeRequest,
+        google::cloud::speech::v1::StreamingRecognizeResponse>>
         streamer;
     grpc::Status status;
     grpc::ClientContext context;
@@ -34,5 +34,4 @@ class SpeechWrapper {
     void initialize_stream();
     void load_speech_context();
     void send_config();
-
 };
