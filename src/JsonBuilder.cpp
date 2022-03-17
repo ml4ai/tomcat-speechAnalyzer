@@ -60,9 +60,11 @@ void JsonBuilder::Initialize() {
         boost::posix_time::microsec_clock::universal_time();
 
     // Initialize postgres connection
-    this->postgres.initialize();
-    this->postgres.trial_id = GLOBAL_LISTENER.trial_id;
-    this->postgres.participant_id = this->participant_id;
+    if(!args.disable_opensmile){
+	    this->postgres.initialize();
+	    this->postgres.trial_id = GLOBAL_LISTENER.trial_id;
+	    this->postgres.participant_id = this->participant_id;
+    }
 }
 
 void JsonBuilder::Shutdown() {
@@ -72,7 +74,9 @@ void JsonBuilder::Shutdown() {
     this->listener_client_thread.join();
 
     // Close postgres connection
-    this->postgres.shutdown();
+    if(!args.disable_opensmile){
+    	this->postgres.shutdown();
+    }
 }
 
 void JsonBuilder::process_message(string message) {
@@ -205,13 +209,19 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
             boost::posix_time::to_iso_extended_string(end_timestamp) + "Z";
 
         // Add sentiment data
-        string features = this->process_alignment_message(response, id);
-        string mmc = this->process_mmc_message(features);
-        message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-        this->strip_mmc_message(message);
-        message["data"]["features"] = nlohmann::json::parse(features)["data"];
-        this->strip_features_message(message);
-
+	if(!args.disable_opensmile){
+		try{
+			string features = this->process_alignment_message(response, id);
+			string mmc = this->process_mmc_message(features);
+			message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+			this->strip_mmc_message(message);
+			message["data"]["features"] = nlohmann::json::parse(features)["data"];
+			this->strip_features_message(message);
+		}
+		catch(std::exception e){
+			BOOST_LOG_TRIVIAL(info) << "Failure processing sentiment analysis";
+		}
+	}
         // Publish message
         this->mosquitto_client.publish("agent/asr/final", message.dump());
 
@@ -295,15 +305,16 @@ void JsonBuilder::process_asr_message_vosk(std::string response) {
             message["data"]["alternatives"] = alternatives;
 
             // Add vocalic features and sentiment
-            string features = this->process_alignment_message_vosk(
-                response_message, message["data"]["id"]);
-            string mmc = this->process_mmc_message(features);
-            message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-            this->strip_mmc_message(message);
-            message["data"]["features"] =
-                nlohmann::json::parse(features)["data"];
-            this->strip_features_message(message);
-
+            if(!args.disable_opensmile){
+		    string features = this->process_alignment_message_vosk(
+			response_message, message["data"]["id"]);
+		    string mmc = this->process_mmc_message(features);
+		    message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+		    this->strip_mmc_message(message);
+		    message["data"]["features"] =
+			nlohmann::json::parse(features)["data"];
+		    this->strip_features_message(message);
+	    }
             // Publish message
             this->mosquitto_client.publish("agent/asr/final", message.dump());
             // Set is_initial to true
@@ -573,7 +584,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "3.5.0";
+    message["version"] = "3.5.1";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
