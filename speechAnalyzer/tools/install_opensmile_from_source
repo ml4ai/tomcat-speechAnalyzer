@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+# Install OpenSMILE from source.
+
+set -euo
+
+git clone https://github.com/audeering/opensmile.git
+pushd opensmile
+    mkdir build
+    cd build
+    cmake ..
+    if [[ $OSTYPE == "linux-gnu" ]]; then
+        NJOBS=$(nproc)
+    else
+        NJOBS=$(sysctl -n hw.ncpu)
+    fi
+
+    make -j $NJOBS
+    make -j $NJOBS install
+popd

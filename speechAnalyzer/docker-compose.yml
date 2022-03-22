@@ -1,0 +1,68 @@
+version: '3'
+
+networks:
+  asist_net:
+   external: true    
+    
+services:
+  speech_analyzer_agent:
+    image: speech_analyzer_agent:latest
+    container_name: speech_analyzer_agent
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json/google_application_credentials.json
+    volumes:
+      - ./google_application_credentials.json:/google_application_credentials.json
+    networks:
+      asist_net:
+        aliases:
+          - speech_analyzer_agent
+    entrypoint: ./speechAnalyzer --mode websocket --disable_opensmile false --disable_asr_google true --disable_asr_vosk false
+  vosk:
+    image: alphacep/kaldi-en:latest
+    container_name: vosk
+    ports:
+      - 2700:2700
+    networks:
+      asist_net:
+        aliases:
+          - vosk
+  mmc:
+    image: mmc:1.0.0
+    container_name: mmc
+    networks:
+      asist_net:
+        aliases:
+          - mmc
+    entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
+
+  db:
+    image: features_database:latest
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: docker
+    ports:
+      - 63332:5432
+    networks:
+      asist_net:
+        aliases:
+          - features_db
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 63333:8080
+    networks:
+      asist_net:
+        aliases:
+          - features_adminer
+  heartbeat:
+    image: heartbeat:latest
+    container_name: heartbeat
+    volumes:
+      - ./config.json:/heartbeat/config.json
+    networks:
+      asist_net:
+        aliases:
+          - heartbeat
+    entrypoint: ["python3", "heartbeat.py"]
