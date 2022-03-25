@@ -17,14 +17,7 @@ class DBWrapper {
     PGconn* get_connection();
     void publish_chunk(nlohmann::json message);
     std::vector<nlohmann::json> features_between(double start_time,
-                                                 double end_time);
-
-    std::string participant_id;
-    bool participant_id_set = false;
-    std::string trial_id;
-    bool trial_id_set = false;
-    std::string experiment_id;
-    double timestamp;
+                                                 double end_time, std::string participant_id, std::string trial_id);
 
   private:
     static const std::vector<char> INVALID_COLUMN_CHARACTERS;

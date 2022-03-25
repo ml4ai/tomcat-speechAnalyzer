@@ -90,15 +90,12 @@ void DBWrapper::publish_chunk_private(nlohmann::json message, int index) {
         values.push_back(element.value());
     }
 
-    // Get timestamp
-    this->timestamp = message["data"]["tmeta"]["time"];
-
-    this->participant_id = to_string(message["data"]["participant_id"]);
-    boost::replace_all(this->participant_id, "\"", "\'");
-    this->trial_id = to_string(message["msg"]["trial_id"]);
-    boost::replace_all(this->trial_id, "\"", "\'");
-    this->experiment_id = to_string(message["msg"]["experiment_id"]);
-    boost::replace_all(this->experiment_id, "\"", "\'");
+    string participant_id = to_string(message["data"]["participant_id"]);
+    boost::replace_all(participant_id, "\"", "\'");
+    string trial_id = to_string(message["msg"]["trial_id"]);
+    boost::replace_all(trial_id, "\"", "\'");
+    string experiment_id = to_string(message["msg"]["experiment_id"]);
+    boost::replace_all(experiment_id, "\"", "\'");
 
     // Convert columns to string format
     ostringstream oss;
@@ -143,7 +140,7 @@ void DBWrapper::publish_chunk_private(nlohmann::json message, int index) {
 }
 
 vector<nlohmann::json> DBWrapper::features_between(double start_time,
-                                                   double end_time) {
+                                                   double end_time, std::string participant_id, std::string trial_id) {
     PGconn* conn;
     PGresult* result;
 
@@ -158,12 +155,14 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     std::string query = "SELECT * FROM features WHERE seconds_offset >= " +
                         to_string(start_time) +
                         " and seconds_offset <= " + to_string(end_time) +
-                        " and participant=" + this->participant_id +
-                        " and trial_id=" + this->trial_id; //+
+                        " and participant=" + "\'" +  participant_id + "\'" + 
+                        " and trial_id=" + "\'" + trial_id + "\'"; //+
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
         BOOST_LOG_TRIVIAL(error) << "FAILURE" << PQerrorMessage(conn);
     }
+
+
     // Turn features into json object
     vector<nlohmann::json> out;
     for (int i = 0; i < PQntuples(result); i++) {

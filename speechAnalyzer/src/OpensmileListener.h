@@ -1,17 +1,17 @@
+#pragma once
+
 #include <string>
 
 #include "OpensmileSession.h"
 #include "JsonBuilder.h"
-
+#include "arguments.h"
 #include "Mosquitto.h"
 
 class OpensmileListener : public Mosquitto {
-  static int socket_port = 10000;
-  int port = -1;
 
   public:
 
-    OpensmileListener(Arguments args, std::string participant_id);
+    OpensmileListener(std::string mqtt_host_internal, int mqtt_port_internal, std::string participant_id, int socket_port);
     ~OpensmileListener();
 
 
@@ -24,9 +24,13 @@ class OpensmileListener : public Mosquitto {
     void Initialize();
     void Shutdown();
    
+    std::string mqtt_host_internal;
+    int mqtt_port_internal;
+    
     std::string participant_id;
     std::thread listener_thread;
 
+    int socket_port;
     OpensmileSession *session;
     JsonBuilder *builder;
 };

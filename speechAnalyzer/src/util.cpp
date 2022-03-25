@@ -21,8 +21,6 @@
 
 namespace beast = boost::beast; // from <boost/beast.hpp>
 
-using google::cloud::speech::v1::StreamingRecognizeRequest;
-using google::cloud::speech::v1::StreamingRecognizeResponse;
 using namespace std;
 
 // Report a failure
@@ -47,17 +45,3 @@ void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
     OPENSMILE_MUTEX.unlock();
 }
 
-// Process responses from an asr stream
-void process_responses(
-    grpc::ClientReaderWriterInterface<StreamingRecognizeRequest,
-                                      StreamingRecognizeResponse>* streamer,
-    JsonBuilder* builder) {
-    StreamingRecognizeResponse response;
-    while (streamer->Read(&response)) { // Returns false when no more to read.
-                                        // Generate UUID4 for messages
-        string id = boost::uuids::to_string(boost::uuids::random_generator()());
-        // Process messages
-        // thread{[=] { builder->process_asr_message(response, id); }}.detach();
-        builder->process_asr_message(response, id);
-    }
-}

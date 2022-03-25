@@ -60,7 +60,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     
     // MQTT client
     Mosquitto mqtt_client;
-    int mqtt_port_internal = 1885;
+    int mqtt_port_internal = 1883;
     string mqtt_host_internal = "mosquitto_internal_speechAnalyzer";
 
     // Threads
@@ -268,9 +268,10 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 			// Publish to message bus	
 			nlohmann::json message;
 			message["chunk"]=encoded;
-			message["participant_id"]=this->participant_id;
-			this->mqtt_client.publish("audio/chunk", message);	
+			message["increment"]=this->increment;
+			this->mqtt_client.publish(this->participant_id, message.dump());	
                 }
+		this->increment++;
             }
         }
     }

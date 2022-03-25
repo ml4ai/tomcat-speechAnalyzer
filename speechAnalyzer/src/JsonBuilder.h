@@ -1,7 +1,6 @@
 #pragma once
 #include "Mosquitto.h"
 #include "TrialListener.h"
-#include "google/cloud/speech/v1/cloud_speech.grpc.pb.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <deque>
 #include <nlohmann/json.hpp>
@@ -29,7 +28,7 @@ class JsonBuilder {
     // Process an openSMILE log messag
     void process_message(std::string message);
 
-    // Process an asr message
+ /*   // Process an asr message
     void process_asr_message(
         google::cloud::speech::v1::StreamingRecognizeResponse response,
         std::string id);
@@ -43,6 +42,8 @@ class JsonBuilder {
         std::string id);
     std::string process_alignment_message_vosk(nlohmann::json response,
                                                std::string id);
+   */
+    void process_sentiment_message(nlohmann::json m);
     std::string process_mmc_message(std::string message);
     void strip_mmc_message(nlohmann::json& message);
     void strip_features_message(nlohmann::json& message);

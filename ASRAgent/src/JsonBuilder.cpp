@@ -47,6 +47,11 @@ void JsonBuilder::Initialize() {
     this->listener_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
 
+    // Setup connection with internal mosquitto broker
+    this->internal_client.connect(
+        "mosquitto_internal_speechAnalyzer", 1883, 1000, 1000, 1000);
+    this->internal_client.set_max_seconds_without_messages(10000);
+    
     // Listen for trial id and experiment id
     this->listener_client.subscribe("trial");
     this->listener_client.subscribe("experiment");
@@ -94,6 +99,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     message["data"]["asr_system"] = "google";
     message["data"]["participant_id"] = this->participant_id;
     message["data"]["id"] = id;
+    message["data"]["utterance_id"] = id;
 
     if (!message["data"]["is_final"]) {
 
@@ -122,7 +128,6 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
     else {
         // Add transcription alternatvie
         vector<nlohmann::json> alternatives;
-
         auto result = response.results(0);
         for (int i = 0; i < result.alternatives_size(); i++) {
             auto alternative = result.alternatives(i);
@@ -132,8 +137,27 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
         }
         message["data"]["alternatives"] = alternatives;
 
+	// Generate word messages
+	vector<nlohmann::json> word_messages;
+	auto utt = result.alternatives(0);
+	for(WordInfo word : utt.words()){
+		int64_t start_seconds = word.start_time().seconds();
+		int32_t start_nanos = word.start_time().nanos();
+        	int64_t end_seconds = word.end_time().seconds();
+       		int32_t end_nanos = word.end_time().nanos();
+		double start_time = this->sync_time + start_seconds + (start_nanos / 1000000000.0);
+		double end_time = this->sync_time + end_seconds + (end_nanos / 1000000000.0);
+
+		nlohmann::json word_message;
+		word_message["word"] = word.word();	
+		word_message["start_time"] = start_time;
+		word_message["end_time"] = end_time;
+		word_messages.push_back(word_message);	
+	}
+	message["data"]["features"]["word_messages"] = word_messages;
+
         // Calculate timestamps
-        auto utt = result.alternatives(0);
+        //auto utt = result.alternatives(0);
         WordInfo f = utt.words(0);
         WordInfo l = utt.words(utt.words().size() - 1);
 
@@ -156,6 +180,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 
         // Publish message
         this->mosquitto_client.publish("agent/asr/final", message.dump());
+        this->internal_client.publish("agent/asr/final", message.dump());
 
         this->is_initial = true;
     }
