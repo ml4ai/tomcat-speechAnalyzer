@@ -2,6 +2,7 @@
 #include <vector>
 #include <thread>
 
+#include <boost/log/trivial.hpp>
 #include <nlohmann/json.hpp>
 
 #include "OpensmileListener.h"
@@ -24,10 +25,6 @@ ASRProcessor::~ASRProcessor(){
 }
 
 void ASRProcessor::Initialize(){
-	// Initialize JsonBuilder
-	this->builder = new JsonBuilder();
-	this->builder->Initialize();
-
 	// Make connection to external mqtt server
 	this->connect(this->mqtt_host, this->mqtt_port, 1000, 1000, 1000);
 	this->subscribe("trial");
@@ -37,7 +34,6 @@ void ASRProcessor::Initialize(){
 }
 
 void ASRProcessor::Shutdown(){
-
 }
 
 void ASRProcessor::InitializeParticipants(vector<string> participants){
@@ -50,13 +46,22 @@ void ASRProcessor::InitializeParticipants(vector<string> participants){
 	}
 }
 
+void ASRProcessor::ClearParticipants(){
+	// Free pointers
+	for(auto p : this->participant_sessions){
+		delete p;
+	}
+
+	// Clear vector
+	this->participant_sessions.clear();
+}
 
 void ASRProcessor::on_message(const std::string& topic,const std::string& message){
 	nlohmann::json m = nlohmann::json::parse(message);
 	if(topic.compare("trial") == 0){
 	       string sub_type = m["msg"]["sub_type"];
 	       if( sub_type.compare("start") == 0){
-		       std::cout << "RECIEVED TRIAL START MESSAGE" << std::endl;
+		       BOOST_LOG_TRIVIAL(info) << "Recieved trial start message";
 			// Set trial info
 			this->trial_id = m["msg"]["trial_id"];
 			this->experiment_id = m["msg"]["experiment_id"];
@@ -68,11 +73,14 @@ void ASRProcessor::on_message(const std::string& topic,const std::string& messag
 				participants.push_back(client["participant_id"]);
 			}
 
-			// Initialize Participants
+			// Initialize participant session
 			this->InitializeParticipants(participants);
 		}
 	       else if( sub_type.compare("stop") == 0){
-		       std::cout << "RECIEVED TRIAL STOP MESSAGE" << std::endl;
+		       BOOST_LOG_TRIVIAL(info) << "Recieved trial stop message";
+	       	       
+		       // Clear participant sessions
+		       this->ClearParticipants();
 	       }
 	}
 }

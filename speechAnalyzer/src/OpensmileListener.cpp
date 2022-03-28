@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/log/trivial.hpp>
+
 #include "arguments.h"
 #include "base64.h"
 #include "OpensmileListener.h"
@@ -23,18 +25,18 @@ OpensmileListener::~OpensmileListener(){
 }
 
 void OpensmileListener::Initialize(){
-	std::cout << "INITIALIZING JSON BUILDER FOR: " << this->participant_id << std::endl;
 	// Initialize JsonBuilder
+	BOOST_LOG_TRIVIAL(info) << "Initializing JsonBuilder for: " << this->participant_id;
 	this->builder = new JsonBuilder();
 	this->builder->participant_id = this->participant_id;
 	this->builder->Initialize();
 
-	std::cout << "INITIALIZING OPENSMILE SESSION FOR: " << this->participant_id << std::endl;
 	// Initialize Opensmile Session
+	BOOST_LOG_TRIVIAL(info) << "Initializing Opensmile Session for: " << this->participant_id;
 	this->session = new OpensmileSession(this->socket_port, this->builder);
 
-	std::cout << "INITIALIZING MOSQUITTO CONNECTION FOR: " << this->participant_id << std::endl;
 	// Connect to broker
+	BOOST_LOG_TRIVIAL(info) << "Initializing Mosquitto connection for: " << this->participant_id;
 	this->connect(this->mqtt_host_internal, this->mqtt_port_internal, 1000, 1000, 1000);
 	this->subscribe(this->participant_id);
 	this->subscribe("agent/asr/final");
@@ -43,14 +45,29 @@ void OpensmileListener::Initialize(){
 }
 
 void OpensmileListener::Shutdown(){
+	// Shutdown JsonBuilder
+	BOOST_LOG_TRIVIAL(info) << "Shutting down JsonBuilder for: " << this->participant_id;
+	this->builder->Shutdown();
 
+	// Shutdown Opensmile Session
+	BOOST_LOG_TRIVIAL(info) << "Shutting down Opensmile Session for: " << this->participant_id;
+	this->session->send_eoi();
+
+	// Shutdown listening thread
+	BOOST_LOG_TRIVIAL(info) << "Shutting down Mosquitto connection for: " << this->participant_id;
+	this->close();
+    	this->listener_thread.join();	
 }
 
 void OpensmileListener::on_message(const std::string& topic,const std::string& message){
 	nlohmann::json m = nlohmann::json::parse(message);
    	
        	if(topic.compare("agent/asr/final") == 0){
-		this->builder->process_sentiment_message(m);
+		// Check if associated with this participant
+		string participant = m["data"]["participant_id"].get<string>();
+		if(this->participant_id.compare(participant) == 0){
+			this->builder->process_sentiment_message(m);
+		}
 	}
 	else{	
 		// Decode base64 chunk

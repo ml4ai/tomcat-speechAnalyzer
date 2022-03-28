@@ -41,15 +41,7 @@ void JsonBuilder::Initialize() {
     // Setup connection with mosquitto broker
     this->mosquitto_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-    this->listener_client.connect(
-        args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-
-    // Listen for trial id and experiment id
-    this->listener_client.subscribe("trial");
-    this->listener_client.subscribe("experiment");
-    this->listener_client.set_max_seconds_without_messages(10000);
-    this->listener_client_thread = thread([this] { listener_client.loop(); });
-
+ 
     // Set the start time for the stream
     this->stream_start_time =
         boost::posix_time::microsec_clock::universal_time();
@@ -63,8 +55,6 @@ void JsonBuilder::Initialize() {
 void JsonBuilder::Shutdown() {
     // Close connection with mosquitto broker
     this->mosquitto_client.close();
-    this->listener_client.close();
-    this->listener_client_thread.join();
 
     // Close postgres connection
     this->postgres.shutdown();
@@ -116,9 +106,9 @@ void JsonBuilder::process_message(string message) {
 
 void JsonBuilder::process_sentiment_message(nlohmann::json m){
 	nlohmann::json message = m;
-//	message["header"] = create_common_header("observation");	
-//	message["msg"] = create_common_header("asr:sentiment");
-
+	message["header"] = this->create_common_header("asr:sentiment");
+	message["msg"] = this->create_common_msg("tomcat_speech_analyzer");
+	
 	// Generate aligned features
 	vector<nlohmann::json> word_messages;
 	for(nlohmann::json word_message : m["data"]["features"]["word_messages"]){
@@ -155,10 +145,13 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m){
 		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
 	}
 	catch(std::exception e){
-		std::cout << "Unable to process sentiment" << std::endl;
+		std::cout << "Unable to process sentiment response" << std::endl;
 		return;
 	}
+
+	// Format and publish message
 	this->strip_mmc_message(message);
+	this->strip_features_message(message);
 	this->mosquitto_client.publish("agent/asr/sentiment", message.dump());
 }
 
@@ -293,22 +286,21 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
 }
 
 void JsonBuilder::strip_mmc_message(nlohmann::json& message) {
-
     // Remove buggy speaker field
     message["data"]["sentiment"].erase("speaker");
+    
+    // Remove features fields
+    message["data"].erase("features");
+    message["data"].erase("word_messages");
+
+    // Remove ASR Fields 
+    message["data"].erase("alternatives");
+    message["data"].erase("asr_system");
+    message["data"].erase("is_final");
+    message["data"].erase("text");
+    message["data"].erase("start_timestamp");
+    message["data"].erase("end_timestamp");
 }
 
 void JsonBuilder::strip_features_message(nlohmann::json& message) {
-
-    // Remove utterance id
-    message["data"]["features"].erase("utterance_id");
-
-    // Remove features text
-    message["data"]["features"].erase("text");
-
-    // Remove vocalic features
-    for (int i = 0; i < message["data"]["features"]["word_messages"].size();
-         i++) {
-        message["data"]["features"]["word_messages"][i].erase("features");
-    }
 }

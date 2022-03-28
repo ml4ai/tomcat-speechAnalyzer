@@ -20,7 +20,7 @@ class ASRProcessor : public Mosquitto {
     ASRProcessor(std::string mqtt_host, int mqtt_port, std::string mqtt_host_internal, int mqtt_port_internal);
     ~ASRProcessor();
 
-
+    bool running = true;
    
   protected:
     void on_message(const std::string& topic,
@@ -29,6 +29,7 @@ class ASRProcessor : public Mosquitto {
   private:
     void Initialize();
     void InitializeParticipants(std::vector<std::string> participants);
+    void ClearParticipants();
     void Shutdown();
     void ProcessASRMessage(nlohmann::json m);
 
@@ -42,5 +43,4 @@ class ASRProcessor : public Mosquitto {
     std::vector<OpensmileListener*> participant_sessions;
     std::thread listener_thread;
 
-    JsonBuilder *builder;
 };
