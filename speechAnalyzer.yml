@@ -1,0 +1,45 @@
+version: '3'
+
+networks:
+  asist_net:
+   external: true    
+    
+services:
+  speechAnalyzer:
+    image: speechanalyzer:latest
+    container_name: speechanalyzer
+    networks:
+      asist_net:
+        aliases:
+          - speechAnalyzer
+    entrypoint: ./speechAnalyzer --mqtt_host host.docker.internal --mqtt_port 1883 --mqtt_host_internal mosquitto_internal_speechAnalyzer --mqtt_port_internal 1883 
+  mmc:
+    image: gitlab.asist.aptima.com:5050/asist/testbed/mmc:1.0.0
+    container_name: mmc
+    networks:
+      asist_net:
+        aliases:
+          - mmc
+    entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
+
+  db:
+    image: gitlab.asist.aptima.com:5050/asist/testbed/features_database:1.1.0
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: docker
+    ports:
+      - 63332:5432
+    networks:
+      asist_net:
+        aliases:
+          - features_db
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 63333:8080
+    networks:
+      asist_net:
+        aliases:
+          - features_adminer
