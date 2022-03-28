@@ -43,6 +43,14 @@ To use the Google Cloud Speech Recognition engine, you will need to point the
 environment variable GOOGLE_APPLICATION_CREDENTIALS to point to your Google
 Cloud credentials file.
 
+### Building locally on MACOS
+
+If using MACOS, there is an additional step required to configure an environmental variable for gRPC:
+'''
+curl -Lo roots.pem https://pki.google.com/roots.pem
+export GRPC_DEFAULT_SSL_ROOTS_FILE_PATH="$PWD/roots.pem"
+'''
+
 Docker instructions
 -------------------
 
