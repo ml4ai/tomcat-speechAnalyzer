@@ -47,7 +47,7 @@ class JsonBuilder {
 
     // Mosquitto client objects
     Mosquitto mosquitto_client;
-    Mosquitto internal_client;
+    Mosquitto mosquitto_client_internal;
     TrialListener listener_client;
     std::thread listener_client_thread;
 

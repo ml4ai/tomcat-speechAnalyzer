@@ -44,20 +44,9 @@ void JsonBuilder::Initialize() {
     // Setup connection with mosquitto broker
     this->mosquitto_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-    this->listener_client.connect(
-        args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-
-    // Setup connection with internal mosquitto broker
-    this->internal_client.connect(
+    this->mosquitto_client_internal.connect(
         "mosquitto_internal_speechAnalyzer", 1883, 1000, 1000, 1000);
-    this->internal_client.set_max_seconds_without_messages(10000);
     
-    // Listen for trial id and experiment id
-    this->listener_client.subscribe("trial");
-    this->listener_client.subscribe("experiment");
-    this->listener_client.set_max_seconds_without_messages(10000);
-    this->listener_client_thread = thread([this] { listener_client.loop(); });
-
     // Set the start time for the stream
     this->stream_start_time =
         boost::posix_time::microsec_clock::universal_time();
@@ -69,9 +58,7 @@ void JsonBuilder::Initialize() {
 void JsonBuilder::Shutdown() {
     // Close connection with mosquitto broker
     this->mosquitto_client.close();
-    this->listener_client.close();
-    this->listener_client_thread.join();
-
+    this->mosquitto_client_internal.close();
 }
 
 // Data for handling google asr messages
@@ -180,7 +167,7 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 
         // Publish message
         this->mosquitto_client.publish("agent/asr/final", message.dump());
-        this->internal_client.publish("agent/asr/final", message.dump());
+        this->mosquitto_client_internal.publish("agent/asr/final", message.dump());
 
         this->is_initial = true;
     }
