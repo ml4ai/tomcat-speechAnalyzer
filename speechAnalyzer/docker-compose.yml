@@ -5,29 +5,16 @@ networks:
    external: true    
     
 services:
-  speech_analyzer_agent:
-    image: speech_analyzer_agent:latest
-    container_name: speech_analyzer_agent
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json/google_application_credentials.json
-    volumes:
-      - ./google_application_credentials.json:/google_application_credentials.json
+  speechAnalyzer:
+    image: speechanalyzer:latest
+    container_name: speechanalyzer
     networks:
       asist_net:
         aliases:
-          - speech_analyzer_agent
-    entrypoint: ./speechAnalyzer --mode websocket --disable_opensmile false --disable_asr_google true --disable_asr_vosk false
-  vosk:
-    image: alphacep/kaldi-en:latest
-    container_name: vosk
-    ports:
-      - 2700:2700
-    networks:
-      asist_net:
-        aliases:
-          - vosk
+          - speechAnalyzer
+    entrypoint: ./speechAnalyzer --mqtt_host host.docker.internal --mqtt_port 1883 --mqtt_host_internal mosquitto_internal_speechAnalyzer --mqtt_port_internal 1883 
   mmc:
-    image: mmc:1.0.0
+    image: gitlab.asist.aptima.com:5050/asist/testbed/mmc:1.0.0
     container_name: mmc
     networks:
       asist_net:
@@ -36,7 +23,7 @@ services:
     entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
 
   db:
-    image: features_database:latest
+    image: gitlab.asist.aptima.com:5050/asist/testbed/features_database:1.1.0
     restart: always
     environment:
       POSTGRES_PASSWORD: docker
@@ -56,13 +43,3 @@ services:
       asist_net:
         aliases:
           - features_adminer
-  heartbeat:
-    image: heartbeat:latest
-    container_name: heartbeat
-    volumes:
-      - ./config.json:/heartbeat/config.json
-    networks:
-      asist_net:
-        aliases:
-          - heartbeat
-    entrypoint: ["python3", "heartbeat.py"]

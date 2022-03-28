@@ -11,21 +11,22 @@ services:
     ports:
       - 8887:8888
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json/google_application_credentials.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json
     volumes:
       - ./google_application_credentials.json:/google_application_credentials.json
     networks:
       asist_net:
         aliases:
           - asr_agent
-    entrypoint: ./asr_agent --mode websocket --mqtt_host host.docker.internal --disable_asr_google false --disable_asr_vosk true
+    entrypoint: ./asr_agent --mode websocket --mqtt_host host.docker.internal --disable_asr_google false --disable_asr_vosk true --disable_opensmile false
   mosquitto:
     image: eclipse-mosquitto
-    ports:
-          - '1885:1883'
-          - '9001:9001'
     container_name: mosquitto
+    ports:
+      - 1885:1883
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
     networks:
       asist_net:
         aliases:
-          - mosquitto_internal_speechAnalyzer  
+          - mosquitto_internal_speechAnalyzer 

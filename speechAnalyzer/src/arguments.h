@@ -7,5 +7,4 @@ struct Arguments {
     int mqtt_port;
     std::string mqtt_host_internal;
     int mqtt_port_internal;
-
 };
