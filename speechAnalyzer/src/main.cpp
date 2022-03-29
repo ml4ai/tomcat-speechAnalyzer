@@ -1,5 +1,8 @@
 #include <string>
 #include <iostream>
+#include <cstdlib>
+#include <signal.h>
+#include <unistd.h>
 
 #include <boost/program_options.hpp>
 #include <boost/log/trivial.hpp>
@@ -12,7 +15,11 @@ using namespace boost::program_options;
 using namespace std;
 
 Arguments JsonBuilder::args;
+bool RUNNING = true;
+void signal_callback_handler(int signum) { RUNNING = false; }
+
 int main(int argc, char *argv[]){
+	signal(SIGINT, signal_callback_handler);
 	BOOST_LOG_TRIVIAL(info) << "Starting speechAnalyzer, awaiting for trial to begin... ";
 	Arguments args;
     	try {
@@ -35,10 +42,11 @@ int main(int argc, char *argv[]){
 		variables_map vm;
 		store(parse_command_line(argc, argv, desc), vm);
 		notify(vm);
-    }
-    catch(exception e){
+       }
+       catch(exception e){
 	
-    }
+       }
+    
     // Setup Global Listener
     JsonBuilder::args = args;
     GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
@@ -50,8 +58,9 @@ int main(int argc, char *argv[]){
     
     // Launch ASRProcessor 
     ASRProcessor *processor = new ASRProcessor(args.mqtt_host, args.mqtt_port, args.mqtt_host_internal, args.mqtt_port_internal);
-    while(processor->running){
-    }
+
+    while(RUNNING){
+    } 
 
     delete processor;
 }
