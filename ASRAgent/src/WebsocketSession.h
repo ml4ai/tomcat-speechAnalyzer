@@ -60,8 +60,6 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
     
     // MQTT client
     Mosquitto mqtt_client;
-    int mqtt_port_internal = 1883;
-    string mqtt_host_internal = "mosquitto_internal_speechAnalyzer";
 
     // Threads
     std::thread consumer_thread;
@@ -141,7 +139,7 @@ class WebsocketSession : public enable_shared_from_this<WebsocketSession> {
 
         // TODO: Initialize data for publishing chunks to message bus
         if (!this->args.disable_opensmile) {
-		this->mqtt_client.connect(this->mqtt_host_internal, this->mqtt_port_internal, 1000, 1000, 1000);
+		this->mqtt_client.connect(this->args.mqtt_host_internal, this->args.mqtt_port_internal, 1000, 1000, 1000);
 		this->mqtt_client.set_max_seconds_without_messages(10000);
         }
         // Initialize Google Speech Session

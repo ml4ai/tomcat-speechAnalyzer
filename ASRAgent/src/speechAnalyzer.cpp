@@ -95,6 +95,12 @@ int main(int argc, char* argv[]) {
             "mqtt_port",
             value<int>(&args.mqtt_port)->default_value(1883),
             "The port of the mqtt broker")(
+            "mqtt_host_internal",
+            value<string>(&args.mqtt_host_internal)->default_value("asr_agent-mosquitto"),
+            "The host address of the internal mqtt broker")(
+            "mqtt_port_internal",
+            value<int>(&args.mqtt_port_internal)->default_value(1883),
+            "The port of the internal mqtt broker")(
             "ws_host",
             value<string>(&args.ws_host)->default_value("0.0.0.0"),
             "The host address of the websocket server")(

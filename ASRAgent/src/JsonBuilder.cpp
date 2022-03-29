@@ -41,11 +41,14 @@ JsonBuilder::JsonBuilder() {}
 JsonBuilder::~JsonBuilder() {}
 
 void JsonBuilder::Initialize() {
-    // Setup connection with mosquitto broker
+    // Setup connection with external mosquitto broker
     this->mosquitto_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-    this->mosquitto_client_internal.connect(
-        "mosquitto_internal_speechAnalyzer", 1883, 1000, 1000, 1000);
+    
+    // Setup connection with internal mosquitto broker
+    if(!this->args.disable_opensmile){
+   	 this->mosquitto_client_internal.connect(this->args.mqtt_host_internal, this->args.mqtt_port_internal, 1000, 1000, 1000);
+    }
     
     // Set the start time for the stream
     this->stream_start_time =
@@ -56,9 +59,13 @@ void JsonBuilder::Initialize() {
 }
 
 void JsonBuilder::Shutdown() {
-    // Close connection with mosquitto broker
+    // Close connection with external  mosquitto broker
     this->mosquitto_client.close();
-    this->mosquitto_client_internal.close();
+    
+    // Close connection with internal  mosquitto broker
+    if(!this->args.disable_opensmile){
+    	this->mosquitto_client_internal.close();
+    }
 }
 
 // Data for handling google asr messages
@@ -144,7 +151,6 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 	message["data"]["features"]["word_messages"] = word_messages;
 
         // Calculate timestamps
-        //auto utt = result.alternatives(0);
         WordInfo f = utt.words(0);
         WordInfo l = utt.words(utt.words().size() - 1);
 
@@ -167,7 +173,11 @@ void JsonBuilder::process_asr_message(StreamingRecognizeResponse response,
 
         // Publish message
         this->mosquitto_client.publish("agent/asr/final", message.dump());
-        this->mosquitto_client_internal.publish("agent/asr/final", message.dump());
+        
+	// Publish message internally
+	if(!this->args.disable_opensmile){
+		this->mosquitto_client_internal.publish("agent/asr/final", message.dump());
+	}
 
         this->is_initial = true;
     }
@@ -297,7 +307,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "3.5.1";
+    message["version"] = "4.0.0";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
