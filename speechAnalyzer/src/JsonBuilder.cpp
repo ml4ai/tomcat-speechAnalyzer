@@ -106,8 +106,8 @@ void JsonBuilder::process_message(string message) {
 
 void JsonBuilder::process_sentiment_message(nlohmann::json m){
 	nlohmann::json message = m;
-	message["header"] = this->create_common_header("asr:sentiment");
-	message["msg"] = this->create_common_msg("tomcat_speech_analyzer");
+	message["header"] = this->create_common_header("observation");
+	message["msg"] = this->create_common_msg("asr:sentiment");
 	
 	// Generate aligned features
 	vector<nlohmann::json> word_messages;
@@ -145,14 +145,30 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m){
 		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
 	}
 	catch(std::exception e){
-		std::cout << "Unable to process sentiment response" << std::endl;
+		std::cout << "Unable to process response from mmc server" << std::endl;
 		return;
 	}
 
-	// Format and publish message
-	this->strip_mmc_message(message);
-	this->strip_features_message(message);
-	this->mosquitto_client.publish("agent/asr/sentiment", message.dump());
+	// Format and publish sentiment message
+	nlohmann::json sentiment;
+	sentiment["header"] = this->create_common_header("observation");
+	sentiment["msg"] = this->create_common_msg("speech_analyzer:sentiment");
+	sentiment["data"]["utterance_id"] = message["data"]["utterance_id"];
+	sentiment["data"]["sentiment"]["emotions"] = message["data"]["sentiment"]["emotions"];
+	sentiment["data"]["sentiment"]["penultimate_emotions"] = message["data"]["sentiment"]["penultimate_emotions"];
+	this->mosquitto_client.publish("agent/speech_analyzer/sentiment", sentiment.dump());
+	
+	// Format and publish personality message
+	nlohmann::json personality;
+	personality["header"] = this->create_common_header("observation");
+	personality["msg"] = this->create_common_msg("speech_analyzer:personality");
+	personality["data"]["utterance_id"] = message["data"]["utterance_id"];
+	sentiment["data"]["personality"]["traits"] = message["data"]["sentiment"]["traits"];
+	sentiment["data"]["personality"]["penultimate_traits"] = message["data"]["sentiment"]["penultimate_traits"];
+	this->mosquitto_client.publish("agent/speech_analyzer/personality", personality.dump());
+
+
+
 }
 
 // Data for handling word/feature alignment messages
@@ -278,7 +294,7 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
     message["timestamp"] = timestamp;
     message["experiment_id"] = GLOBAL_LISTENER.experiment_id;
     message["trial_id"] = GLOBAL_LISTENER.trial_id;
-    message["version"] = "3.5.1";
+    message["version"] = "4.0.0";
     message["source"] = "tomcat_speech_analyzer";
     message["sub_type"] = sub_type;
 
