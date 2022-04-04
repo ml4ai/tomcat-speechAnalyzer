@@ -6,6 +6,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/console.hpp>
 
 #include "GlobalMosquittoListener.h"
 #include "arguments.h"
@@ -19,7 +20,13 @@ bool RUNNING = true;
 void signal_callback_handler(int signum) { RUNNING = false; }
 
 int main(int argc, char *argv[]){
+	// Set up callback for SIGINT
 	signal(SIGINT, signal_callback_handler);
+
+	// Enable Boost logging
+    	boost::log::add_console_log(std::cout,
+                                boost::log::keywords::auto_flush = true);
+	
 	BOOST_LOG_TRIVIAL(info) << "Starting speechAnalyzer, awaiting for trial to begin... ";
 	Arguments args;
     	try {

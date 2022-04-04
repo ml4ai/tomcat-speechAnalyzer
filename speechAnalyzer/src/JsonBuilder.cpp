@@ -106,8 +106,6 @@ void JsonBuilder::process_message(string message) {
 
 void JsonBuilder::process_sentiment_message(nlohmann::json m){
 	nlohmann::json message = m;
-	message["header"] = this->create_common_header("observation");
-	message["msg"] = this->create_common_msg("asr:sentiment");
 	
 	// Generate aligned features
 	vector<nlohmann::json> word_messages;

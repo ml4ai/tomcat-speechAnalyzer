@@ -5,7 +5,7 @@
 #include <boost/log/trivial.hpp>
 #include <nlohmann/json.hpp>
 
-#include "OpensmileListener.h"
+#include "OpensmileSession.h"
 #include "arguments.h"
 #include "ASRProcessor.h"
 
@@ -25,6 +25,9 @@ ASRProcessor::~ASRProcessor(){
 }
 
 void ASRProcessor::Initialize(){
+	this->builder = new JsonBuilder();
+    	this->builder->Initialize();
+	
 	// Make connection to external mqtt server
 	this->connect(this->mqtt_host, this->mqtt_port, 1000, 1000, 1000);
 	this->subscribe("trial");
@@ -34,15 +37,14 @@ void ASRProcessor::Initialize(){
 }
 
 void ASRProcessor::Shutdown(){
+	this->ClearParticipants();
 }
 
 void ASRProcessor::InitializeParticipants(vector<string> participants){
 	for(string participant : participants){
 		// Create OpensmileListener 
-		this->participant_sessions.push_back(new OpensmileListener(this->mqtt_host_internal, this->mqtt_port_internal, participant, this->socket_port));
+		this->participant_sessions.push_back(new OpensmileSession(participant, this->mqtt_host_internal, this->mqtt_port_internal));
 
-		// Update socket port
-		this->socket_port++;
 	}
 }
 
@@ -82,5 +84,8 @@ void ASRProcessor::on_message(const std::string& topic,const std::string& messag
 		       // Clear participant sessions
 		       this->ClearParticipants();
 	       }
+	}
+	else if(topic.compare("agent/asr/final") == 0){
+		this->builder->process_sentiment_message(m);
 	}
 }

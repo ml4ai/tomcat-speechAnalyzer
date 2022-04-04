@@ -30,18 +30,7 @@ void fail(beast::error_code ec, char const* what) {
 
 // Callback function for openSMILE messages
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
-    int socket = *((int*)(param));
-    int len = -1;
-    int num_bytes = 256;
-
-    // Copy string for sending
-    string temp(message.text);
-    char text[num_bytes];
-    strcpy(text, temp.c_str());
-
-    OPENSMILE_MUTEX.lock();
-    // Send message
-    len = send(socket, &text, num_bytes, 0);
-    OPENSMILE_MUTEX.unlock();
+    JsonBuilder *builder = (JsonBuilder*)(param);
+    builder->process_message(message.text);
 }
 

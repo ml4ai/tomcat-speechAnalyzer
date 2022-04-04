@@ -39,7 +39,7 @@ add_executable(speechAnalyzer
     src/TrialListener.cpp
     src/GlobalMosquittoListener.cpp
     src/OpensmileSession.cpp
-    src/OpensmileListener.cpp
+    # src/OpensmileListener.cpp
     src/DBWrapper.cpp
     src/util.cpp
     src/base64.c

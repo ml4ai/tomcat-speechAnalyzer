@@ -162,7 +162,6 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
         BOOST_LOG_TRIVIAL(error) << "FAILURE" << PQerrorMessage(conn);
     }
 
-
     // Turn features into json object
     vector<nlohmann::json> out;
     for (int i = 0; i < PQntuples(result); i++) {

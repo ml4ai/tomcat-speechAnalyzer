@@ -7,7 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include "JsonBuilder.h"
-#include "OpensmileListener.h"
+#include "OpensmileSession.h"
 #include "arguments.h"
 #include "Mosquitto.h"
 
@@ -39,8 +39,8 @@ class ASRProcessor : public Mosquitto {
     std::string mqtt_host_internal;
     int mqtt_port_internal;
 
-    int socket_port = 10000;
-    std::vector<OpensmileListener*> participant_sessions;
+    JsonBuilder *builder;
+    std::vector<OpensmileSession*> participant_sessions;
     std::thread listener_thread;
 
 };

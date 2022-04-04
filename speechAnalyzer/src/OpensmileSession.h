@@ -1,62 +1,41 @@
+#pragma once
+
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <queue>
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
-
-#include <mutex>
 
 #include "JsonBuilder.h"
 #include <smileapi/SMILEapi.h>
 
-class OpensmileClient {
+
+class OpensmileSession : Mosquitto {
   public:
-    OpensmileClient(int socket_port, JsonBuilder* builder);
-    void send_chunk(std::vector<float> float_chunk);
-    void send_eoi();
-    void loop();
+    OpensmileSession(std::string participant_id, std::string mqtt_host_internal, int mqtt_port_internal);
+    ~OpensmileSession();
+
+    
 
   private:
-    JsonBuilder* builder;
+    void Initialize();
+    void Shutdown();
+    void Loop();
+    void on_message(const std::string& topic,const std::string& message) override;
+    
+    std::string mqtt_host_internal;
+    int mqtt_port_internal;
+    std::thread listener_thread;
 
-    bool looping;
-    std::thread loop_thread;
+    std::string participant_id;
+    std::mutex mutex;
+    std::queue<std::vector<float>> queue;
 
-    int sock = 0, valread;
-    struct sockaddr_in serv_addr;
-    int socket_port;
-};
-
-class OpensmileServer {
-  public:
-    OpensmileServer(int socket_port);
-
-  private:
+    JsonBuilder *builder;
     smileobj_t* handle;
     std::thread opensmile_thread;
-
-    int server_fd, new_socket, valread;
-    struct sockaddr_in address;
-    int opt = 1;
-    int addrlen = sizeof(address);
-    int socket_port;
-};
-
-class OpensmileSession {
-  public:
-    OpensmileSession(int socket_port, JsonBuilder* builder);
-
-    void send_chunk(std::vector<float> float_chunk);
-    void send_eoi();
-
-  private:
-    int mode = -1;
-    OpensmileClient* client;
-    OpensmileServer* server;
 };
