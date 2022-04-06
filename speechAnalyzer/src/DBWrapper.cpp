@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -45,6 +46,9 @@ void DBWrapper::initialize() {
         this->thread_pool.push_back(std::thread{[this, i] { this->loop(i); }});
         this->queue_pool.push_back(std::queue<nlohmann::json>());
     }
+
+    // Initialize Column Map
+    this->InitializeColumnMap();
 }
 void DBWrapper::shutdown() {
     this->running = false;
@@ -182,6 +186,19 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     PQclear(result);
     PQfinish(conn);
     return out;
+}
+
+void DBWrapper::InitializeColumnMap(){
+	ifstream file("conf/column_map.txt");
+	string opensmile_format;
+	string postgres_format;
+
+	while(!file.eof()){
+		file >> opensmile_format;
+		file >> postgres_format;
+		this->column_map[opensmile_format] = postgres_format;
+		this->column_map[postgres_format] = opensmile_format;
+	}
 }
 
 string DBWrapper::format_to_db_string(std::string in) {

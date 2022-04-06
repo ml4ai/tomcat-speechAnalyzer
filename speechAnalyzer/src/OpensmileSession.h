@@ -27,6 +27,8 @@ class OpensmileSession : Mosquitto {
     void Loop();
     void on_message(const std::string& topic,const std::string& message) override;
     
+    bool running = false;
+
     std::string mqtt_host_internal;
     int mqtt_port_internal;
     std::thread listener_thread;

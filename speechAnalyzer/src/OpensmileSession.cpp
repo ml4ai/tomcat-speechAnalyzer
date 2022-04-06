@@ -19,7 +19,7 @@
 
 #include "OpensmileSession.h"
 
-OpensmileSession::OpensmileSession(string participant_id, string mqtt_host_internal, int mqtt_port_internal) {
+OpensmileSession::OpensmileSession(string participant_id, string mqtt_host_internal, int mqtt_port_internal) { 
     this->participant_id = participant_id;
     this->mqtt_host_internal = mqtt_host_internal;
     this->mqtt_port_internal = mqtt_port_internal;
@@ -30,10 +30,14 @@ OpensmileSession::OpensmileSession(string participant_id, string mqtt_host_inter
 }
 
 OpensmileSession::~OpensmileSession(){
-	this->Shutdown();
+	if(this->running){
+		this->Shutdown();
+	}
 }
 
 void OpensmileSession::Initialize(){
+    this->running = true;
+    
     // Initialize JsonBuilder
     BOOST_LOG_TRIVIAL(info) << "Initializing JsonBuilder for: " << this->participant_id;
     this->builder = new JsonBuilder();
@@ -59,20 +63,27 @@ void OpensmileSession::Initialize(){
         BOOST_LOG_TRIVIAL(info) << "Initializing Mosquitto connection for: " << this->participant_id;
         this->connect(this->mqtt_host_internal, this->mqtt_port_internal, 1000, 1000, 1000);
         this->subscribe(this->participant_id);
+	this->subscribe("shutdown");
         this->set_max_seconds_without_messages(10000);
         this->listener_thread = thread([this] { this->loop(); });
+
 }
 
 void OpensmileSession::Shutdown(){
-    	smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
+	this->running = false;
+
+	// Close listening session
+	this->close();
+    	
+	// Close Opensmile Session
+	smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
     	smile_free(this->handle);
 	exit(0);
 }
 
 void OpensmileSession::Loop(){
 	vector<float> float_chunk;
-	while(true){	
-		// Pop chunk
+	while(this->running){	
 		this->mutex.lock();
 	 	if(!this->queue.empty()){
 			float_chunk = this->queue.front();
@@ -98,7 +109,12 @@ void OpensmileSession::Loop(){
 }
 
 void OpensmileSession::on_message(const std::string& topic,const std::string& message){
-        nlohmann::json m = nlohmann::json::parse(message);
+        if(topic.compare("shutdown") == 0){
+		this->Shutdown();
+		return;
+	}
+
+	nlohmann::json m = nlohmann::json::parse(message);
 
 	// Decode base64 chunk
 	string coded_src = m["chunk"];

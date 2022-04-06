@@ -72,17 +72,25 @@ void ASRProcessor::on_message(const std::string& topic,const std::string& messag
 			vector<string> participants;
 			nlohmann::json client_info = m["data"]["client_info"];
 			for(nlohmann::json client : client_info){
-				participants.push_back(client["participant_id"]);
+				participants.push_back(client["playername"]);
 			}
 
 			// Initialize participant session
 			this->InitializeParticipants(participants);
 		}
 	       else if( sub_type.compare("stop") == 0){
-		       BOOST_LOG_TRIVIAL(info) << "Recieved trial stop message";
+		       BOOST_LOG_TRIVIAL(info) << "Recieved trial stop message, shutting down Opensmile sessions...";
 	       	       
 		       // Clear participant sessions
 		       this->ClearParticipants();
+
+		       // Send shutdown message to internal message bus
+		       Mosquitto temp_client;
+		       temp_client.connect(this->mqtt_host_internal, this->mqtt_port_internal, 1000, 1000, 1000);
+		       temp_client.publish("shutdown", message);
+		       temp_client.close();
+
+		       BOOST_LOG_TRIVIAL(info) << "Ready for next trial";
 	       }
 	}
 	else if(topic.compare("agent/asr/final") == 0){

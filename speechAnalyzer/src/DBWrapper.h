@@ -42,4 +42,5 @@ class DBWrapper {
 
     void publish_chunk_private(nlohmann::json message, int index);
     void loop(int index);
+    void InitializeColumnMap();
 };
