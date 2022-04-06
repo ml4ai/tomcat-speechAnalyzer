@@ -155,16 +155,17 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m){
 	sentiment["data"]["sentiment"]["emotions"] = message["data"]["sentiment"]["emotions"];
 	sentiment["data"]["sentiment"]["penultimate_emotions"] = message["data"]["sentiment"]["penultimate_emotions"];
 	this->mosquitto_client.publish("agent/speech_analyzer/sentiment", sentiment.dump());
+	std::cout << sentiment.dump() << std::endl;
 	
 	// Format and publish personality message
 	nlohmann::json personality;
 	personality["header"] = this->create_common_header("observation");
 	personality["msg"] = this->create_common_msg("speech_analyzer:personality");
 	personality["data"]["utterance_id"] = message["data"]["utterance_id"];
-	sentiment["data"]["personality"]["traits"] = message["data"]["sentiment"]["traits"];
-	sentiment["data"]["personality"]["penultimate_traits"] = message["data"]["sentiment"]["penultimate_traits"];
+	personality["data"]["personality"]["traits"] = message["data"]["sentiment"]["traits"];
+	personality["data"]["personality"]["penultimate_traits"] = message["data"]["sentiment"]["penultimate_traits"];
 	this->mosquitto_client.publish("agent/speech_analyzer/personality", personality.dump());
-
+	std::cout << personality.dump() << std::endl;
 
 
 }
