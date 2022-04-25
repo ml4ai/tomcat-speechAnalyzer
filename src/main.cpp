@@ -67,8 +67,10 @@ int main(int argc, char *argv[]){
     ASRProcessor *processor = new ASRProcessor(args.mqtt_host, args.mqtt_port, args.mqtt_host_internal, args.mqtt_port_internal);
 
     // Yield main thread until exit
+    chrono::milliseconds duration(1);
     while(RUNNING){
     	this_thread::yield();
+	this_thread::sleep_for(duration);
     } 
 
     exit(0);
