@@ -5,30 +5,6 @@ networks:
    external: true    
     
 services:
-  # asr_agent services
-  asr_agent:
-    image: asr_agent:latest
-    container_name: asr_agent
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/google_application_credentials.json
-    volumes:
-      - ./google_application_credentials.json:/google_application_credentials.json
-    networks:
-      asist_net:
-        aliases:
-          - asr_agent
-    entrypoint: ./asr_agent --mode websocket --mqtt_host host.docker.internal --disable_asr_google false --disable_asr_vosk true --disable_opensmile false
-  mosquitto:
-    image: eclipse-mosquitto
-    container_name: mosquitto
-    volumes:
-      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
-    networks:
-      asist_net:
-        aliases:
-          - mosquitto_internal_speechAnalyzer 
-  
-  # speechAnalyzer services 
   speechAnalyzer:
     image: speechanalyzer:latest
     container_name: speechanalyzer
@@ -36,7 +12,7 @@ services:
       asist_net:
         aliases:
           - speechAnalyzer
-    entrypoint: ./speechAnalyzer --mqtt_host host.docker.internal --mqtt_port 1883 --mqtt_host_internal mosquitto_internal_speechAnalyzer --mqtt_port_internal 1883
+    entrypoint: ./speechAnalyzer --mqtt_host host.docker.internal --mqtt_port 1883 --mqtt_host_internal asr_agent-mosquitto --mqtt_port_internal 1883 
   mmc:
     image: gitlab.asist.aptima.com:5050/asist/testbed/mmc:1.0.0
     container_name: mmc
@@ -45,6 +21,7 @@ services:
         aliases:
           - mmc
     entrypoint: uvicorn mmc_server:app --host 0.0.0.0 --port 8001
+
   db:
     image: gitlab.asist.aptima.com:5050/asist/testbed/features_database:1.1.0
     restart: always
@@ -56,3 +33,13 @@ services:
       asist_net:
         aliases:
           - features_db
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 63333:8080
+    networks:
+      asist_net:
+        aliases:
+          - features_adminer
