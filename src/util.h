@@ -13,4 +13,3 @@ void fail(beast::error_code ec, char const* what);
 
 // Callback function for openSMILE messages
 void log_callback(smileobj_t*, smilelogmsg_t, void*);
-

@@ -1,14 +1,14 @@
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <map>
 #include <mutex>
 #include <queue>
 #include <sstream>
+#include <stack>
 #include <stdlib.h>
 #include <string>
 #include <vector>
-#include <fstream>
-#include <stack>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -28,19 +28,17 @@ using namespace std;
 const vector<char> DBWrapper::INVALID_COLUMN_CHARACTERS = {
     '+', '-', '(', ')', '\n', '.'};
 
-DBWrapper::DBWrapper() {
-	this->Initialize();
-}
+DBWrapper::DBWrapper() { this->Initialize(); }
 
 DBWrapper::~DBWrapper() {
-	if(this->running){
-		this->Shutdown();
-	}
+    if (this->running) {
+        this->Shutdown();
+    }
 }
 
 void DBWrapper::Initialize() {
     this->running = true;
-    
+
     // Initialize Column Map
     this->InitializeColumnMap();
 
@@ -62,36 +60,37 @@ void DBWrapper::Shutdown() {
     BOOST_LOG_TRIVIAL(info) << "Shutdown DB connections";
 }
 
-PGconn* DBWrapper::GetConnection(){
-	PGconn *conn;
-	std::unique_lock<std::mutex> guard(connection_mutex);
-	if(this->ConnectionAvaliable()){
-		conn = connection_pool.top();
-		connection_pool.pop();
-	}
-	else{
-		this->connection_condition.wait(guard, [this]{return this->ConnectionAvaliable();});
-		conn = connection_pool.top();
-		connection_pool.pop();
-	}
+PGconn* DBWrapper::GetConnection() {
+    PGconn* conn;
+    std::unique_lock<std::mutex> guard(connection_mutex);
+    if (this->ConnectionAvaliable()) {
+        conn = connection_pool.top();
+        connection_pool.pop();
+    }
+    else {
+        this->connection_condition.wait(
+            guard, [this] { return this->ConnectionAvaliable(); });
+        conn = connection_pool.top();
+        connection_pool.pop();
+    }
     return conn;
 }
 
-void DBWrapper::FreeConnection(PGconn *conn){
-	std::lock_guard<std::mutex> guard(connection_mutex);
-	this->connection_pool.push(conn);
-	this->connection_condition.notify_one();
+void DBWrapper::FreeConnection(PGconn* conn) {
+    std::lock_guard<std::mutex> guard(connection_mutex);
+    this->connection_pool.push(conn);
+    this->connection_condition.notify_one();
 }
 
-bool DBWrapper::ConnectionAvaliable(){
-	if(this->connection_pool.empty()){
-		return false;
-	}
-	return true;
+bool DBWrapper::ConnectionAvaliable() {
+    if (this->connection_pool.empty()) {
+        return false;
+    }
+    return true;
 }
 void DBWrapper::publish_chunk(nlohmann::json message) {
     // Create thread object to handle io
-    std::thread io([this, message] {this->publish_chunk_private(message);});
+    std::thread io([this, message] { this->publish_chunk_private(message); });
     io.detach();
 }
 
@@ -157,13 +156,15 @@ void DBWrapper::publish_chunk_private(nlohmann::json message) {
     }
     // Clear result
     PQclear(result);
-    
+
     // Add connection object back to pool
     this->FreeConnection(conn);
 }
 
 vector<nlohmann::json> DBWrapper::features_between(double start_time,
-                                                   double end_time, std::string participant_id, std::string trial_id) {
+                                                   double end_time,
+                                                   std::string participant_id,
+                                                   std::string trial_id) {
     PGconn* conn;
     PGresult* result;
 
@@ -178,7 +179,7 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     std::string query = "SELECT * FROM features WHERE seconds_offset >= " +
                         to_string(start_time) +
                         " and seconds_offset <= " + to_string(end_time) +
-                        " and participant=" + "\'" +  participant_id + "\'" + 
+                        " and participant=" + "\'" + participant_id + "\'" +
                         " and trial_id=" + "\'" + trial_id + "\'"; //+
     result = PQexec(conn, query.c_str());
     if (result == NULL) {
@@ -207,17 +208,17 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
     return out;
 }
 
-void DBWrapper::InitializeColumnMap(){
-	ifstream file("conf/column_map.txt");
-	string opensmile_format;
-	string postgres_format;
+void DBWrapper::InitializeColumnMap() {
+    ifstream file("conf/column_map.txt");
+    string opensmile_format;
+    string postgres_format;
 
-	while(!file.eof()){
-		file >> opensmile_format;
-		file >> postgres_format;
-		this->column_map[opensmile_format] = postgres_format;
-		this->column_map[postgres_format] = opensmile_format;
-	}
+    while (!file.eof()) {
+        file >> opensmile_format;
+        file >> postgres_format;
+        this->column_map[opensmile_format] = postgres_format;
+        this->column_map[postgres_format] = opensmile_format;
+    }
 }
 
 string DBWrapper::format_to_db_string(std::string in) {

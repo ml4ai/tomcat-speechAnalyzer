@@ -41,13 +41,12 @@ void JsonBuilder::Initialize() {
     // Setup connection with mosquitto broker
     this->mosquitto_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
- 
+
     // Set the start time for the stream
     this->stream_start_time =
         boost::posix_time::microsec_clock::universal_time();
     this->stream_start_time_vosk =
         boost::posix_time::microsec_clock::universal_time();
-
 }
 
 void JsonBuilder::Shutdown() {
@@ -99,70 +98,79 @@ void JsonBuilder::process_message(string message) {
     }
 }
 
-void JsonBuilder::process_sentiment_message(nlohmann::json m){
-	nlohmann::json message = m;
-	
-	// Generate aligned features
-	vector<nlohmann::json> word_messages;
-	for(nlohmann::json word_message : m["data"]["features"]["word_messages"]){
-		double start_time = word_message["start_time"];
-		double end_time = word_message["end_time"];
+void JsonBuilder::process_sentiment_message(nlohmann::json m) {
+    nlohmann::json message = m;
 
-		vector<nlohmann::json> history = this->postgres.features_between(start_time, end_time, m["data"]["participant_id"], m["msg"]["trial_id"]);
-		nlohmann::json features_output;
-		if(history.size() == 0){
-			features_output = nullptr;
-			word_message["features"] = nullptr;
-		}
-		else{
-			for (auto& it : history[0].items()){
-				features_output[it.key()] = vector<double>();
-			}
-			 // Load the features output from the history entries
-            		for (auto entry : history) {
-                		for (auto& it : history[0].items()) {
-                    			features_output[it.key()].push_back(entry[it.key()]);
-                		}
-            		}
-			word_message["features"] = features_output.dump();
-		}
-		word_messages.push_back(word_message);
-	}
-	message["data"]["features"]["word_messages"] = word_messages;
+    // Generate aligned features
+    vector<nlohmann::json> word_messages;
+    for (nlohmann::json word_message : m["data"]["features"]["word_messages"]) {
+        double start_time = word_message["start_time"];
+        double end_time = word_message["end_time"];
 
-	// Send to MMC Server
-	message["data"]["word_messages"] = message["data"]["features"]["word_messages"];
-	string features = message.dump();
-	string mmc = this->process_mmc_message(message.dump());
-	try{
-		message["data"]["sentiment"] = nlohmann::json::parse(mmc);
-	}
-	catch(std::exception e){
-		std::cout << "Unable to process response from mmc server" << std::endl;
-		return;
-	}
+        vector<nlohmann::json> history =
+            this->postgres.features_between(start_time,
+                                            end_time,
+                                            m["data"]["participant_id"],
+                                            m["msg"]["trial_id"]);
+        nlohmann::json features_output;
+        if (history.size() == 0) {
+            features_output = nullptr;
+            word_message["features"] = nullptr;
+        }
+        else {
+            for (auto& it : history[0].items()) {
+                features_output[it.key()] = vector<double>();
+            }
+            // Load the features output from the history entries
+            for (auto entry : history) {
+                for (auto& it : history[0].items()) {
+                    features_output[it.key()].push_back(entry[it.key()]);
+                }
+            }
+            word_message["features"] = features_output.dump();
+        }
+        word_messages.push_back(word_message);
+    }
+    message["data"]["features"]["word_messages"] = word_messages;
 
-	// Format and publish sentiment message
-	nlohmann::json sentiment;
-	sentiment["header"] = this->create_common_header("observation");
-	sentiment["msg"] = this->create_common_msg("speech_analyzer:sentiment");
-	sentiment["data"]["utterance_id"] = message["data"]["utterance_id"];
-	sentiment["data"]["sentiment"]["emotions"] = message["data"]["sentiment"]["emotions"];
-	sentiment["data"]["sentiment"]["penultimate_emotions"] = message["data"]["sentiment"]["penultimate_emotions"];
-	this->mosquitto_client.publish("agent/speech_analyzer/sentiment", sentiment.dump());
-	std::cout << sentiment.dump() << std::endl;
-	
-	// Format and publish personality message
-	nlohmann::json personality;
-	personality["header"] = this->create_common_header("observation");
-	personality["msg"] = this->create_common_msg("speech_analyzer:personality");
-	personality["data"]["utterance_id"] = message["data"]["utterance_id"];
-	personality["data"]["personality"]["traits"] = message["data"]["sentiment"]["traits"];
-	personality["data"]["personality"]["penultimate_traits"] = message["data"]["sentiment"]["penultimate_traits"];
-	this->mosquitto_client.publish("agent/speech_analyzer/personality", personality.dump());
-	std::cout << personality.dump() << std::endl;
+    // Send to MMC Server
+    message["data"]["word_messages"] =
+        message["data"]["features"]["word_messages"];
+    string features = message.dump();
+    string mmc = this->process_mmc_message(message.dump());
+    try {
+        message["data"]["sentiment"] = nlohmann::json::parse(mmc);
+    }
+    catch (std::exception e) {
+        std::cout << "Unable to process response from mmc server" << std::endl;
+        return;
+    }
 
+    // Format and publish sentiment message
+    nlohmann::json sentiment;
+    sentiment["header"] = this->create_common_header("observation");
+    sentiment["msg"] = this->create_common_msg("speech_analyzer:sentiment");
+    sentiment["data"]["utterance_id"] = message["data"]["utterance_id"];
+    sentiment["data"]["sentiment"]["emotions"] =
+        message["data"]["sentiment"]["emotions"];
+    sentiment["data"]["sentiment"]["penultimate_emotions"] =
+        message["data"]["sentiment"]["penultimate_emotions"];
+    this->mosquitto_client.publish("agent/speech_analyzer/sentiment",
+                                   sentiment.dump());
+    std::cout << sentiment.dump() << std::endl;
 
+    // Format and publish personality message
+    nlohmann::json personality;
+    personality["header"] = this->create_common_header("observation");
+    personality["msg"] = this->create_common_msg("speech_analyzer:personality");
+    personality["data"]["utterance_id"] = message["data"]["utterance_id"];
+    personality["data"]["personality"]["traits"] =
+        message["data"]["sentiment"]["traits"];
+    personality["data"]["personality"]["penultimate_traits"] =
+        message["data"]["sentiment"]["penultimate_traits"];
+    this->mosquitto_client.publish("agent/speech_analyzer/personality",
+                                   personality.dump());
+    std::cout << personality.dump() << std::endl;
 }
 
 // Data for handling word/feature alignment messages
@@ -262,7 +270,6 @@ void JsonBuilder::update_sync_time(double sync_time) {
         boost::posix_time::microsec_clock::universal_time();
 }
 
-
 // Methods for creating common message types
 nlohmann::json JsonBuilder::create_common_header(string message_type) {
     nlohmann::json header;
@@ -298,12 +305,12 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
 void JsonBuilder::strip_mmc_message(nlohmann::json& message) {
     // Remove buggy speaker field
     message["data"]["sentiment"].erase("speaker");
-    
+
     // Remove features fields
     message["data"].erase("features");
     message["data"].erase("word_messages");
 
-    // Remove ASR Fields 
+    // Remove ASR Fields
     message["data"].erase("alternatives");
     message["data"].erase("asr_system");
     message["data"].erase("is_final");
@@ -312,5 +319,4 @@ void JsonBuilder::strip_mmc_message(nlohmann::json& message) {
     message["data"].erase("end_timestamp");
 }
 
-void JsonBuilder::strip_features_message(nlohmann::json& message) {
-}
+void JsonBuilder::strip_features_message(nlohmann::json& message) {}

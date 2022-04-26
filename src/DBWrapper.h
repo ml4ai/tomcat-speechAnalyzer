@@ -1,13 +1,13 @@
+#include <condition_variable>
 #include <libpq-fe.h>
-#include <nlohmann/json.hpp>
 #include <map>
 #include <mutex>
-#include <condition_variable>
+#include <nlohmann/json.hpp>
 #include <queue>
+#include <stack>
 #include <string>
 #include <thread>
 #include <vector>
-#include <stack>
 
 class DBWrapper {
   public:
@@ -16,19 +16,19 @@ class DBWrapper {
 
     void Initialize();
     void Shutdown();
-    
+
     void publish_chunk(nlohmann::json message);
     std::vector<nlohmann::json> features_between(double start_time,
-                                                 double end_time, std::string participant_id, std::string trial_id);
+                                                 double end_time,
+                                                 std::string participant_id,
+                                                 std::string trial_id);
 
   private:
-
-    // Util code for handling postgres and opensmile formats 
+    // Util code for handling postgres and opensmile formats
     static const std::vector<char> INVALID_COLUMN_CHARACTERS;
     std::map<std::string, std::string> column_map;
     void InitializeColumnMap();
     std::string format_to_db_string(std::string in);
-
 
     // DB connection info
     std::string client_id;

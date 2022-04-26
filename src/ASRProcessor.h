@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 
 #include <string>
 #include <thread>
@@ -7,9 +7,9 @@
 #include <nlohmann/json.hpp>
 
 #include "JsonBuilder.h"
+#include "Mosquitto.h"
 #include "OpensmileSession.h"
 #include "arguments.h"
-#include "Mosquitto.h"
 
 class ASRProcessor : public Mosquitto {
 
@@ -17,11 +17,12 @@ class ASRProcessor : public Mosquitto {
     std::string trial_id = "00000000-0000-0000-0000-000000000000";
     std::string experiment_id = "00000000-0000-0000-0000-000000000000";
 
-    ASRProcessor(std::string mqtt_host, int mqtt_port, std::string mqtt_host_internal, int mqtt_port_internal);
+    ASRProcessor(std::string mqtt_host, int mqtt_port,
+                 std::string mqtt_host_internal, int mqtt_port_internal);
     ~ASRProcessor();
 
     bool running = true;
-   
+
   protected:
     void on_message(const std::string& topic,
                     const std::string& message) override;
@@ -39,8 +40,7 @@ class ASRProcessor : public Mosquitto {
     std::string mqtt_host_internal;
     int mqtt_port_internal;
 
-    JsonBuilder *builder;
+    JsonBuilder* builder;
     std::vector<OpensmileSession*> participant_sessions;
     std::thread listener_thread;
-
 };
