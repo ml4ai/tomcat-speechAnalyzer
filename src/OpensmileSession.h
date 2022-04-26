@@ -25,6 +25,7 @@ class OpensmileSession : Mosquitto {
     void Initialize();
     void Shutdown();
     void Loop();
+    void PublishChunk(std::vector<float> float_chunk);
     void on_message(const std::string& topic,const std::string& message) override;
     
     bool running = false;
@@ -36,7 +37,6 @@ class OpensmileSession : Mosquitto {
 
     std::string participant_id;
     std::mutex mutex;
-    std::queue<std::vector<float>> queue;
 
     JsonBuilder *builder;
     smileobj_t* handle;

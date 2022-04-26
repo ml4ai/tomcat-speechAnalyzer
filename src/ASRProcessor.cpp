@@ -32,7 +32,7 @@ void ASRProcessor::Initialize(){
 	this->connect(this->mqtt_host, this->mqtt_port, 1000, 1000, 1000);
 	this->subscribe("trial");
 	this->subscribe("agent/asr/final");
-	this->set_max_seconds_without_messages(10000);
+	this->set_max_seconds_without_messages(100000000);
 	this->listener_thread = thread([this] { this->loop(); });
 }
 
@@ -41,9 +41,9 @@ void ASRProcessor::Shutdown(){
 }
 
 void ASRProcessor::InitializeParticipants(vector<string> participants){
-	for(string participant : participants){
+	for(int i=0; i<participants.size(); i++){
 		// Create OpensmileListener 
-		this->participant_sessions.push_back(new OpensmileSession(participant, this->mqtt_host_internal, this->mqtt_port_internal));
+		this->participant_sessions.push_back(new OpensmileSession(participants[i], this->mqtt_host_internal, this->mqtt_port_internal));
 
 	}
 }

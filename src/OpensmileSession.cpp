@@ -26,7 +26,7 @@ OpensmileSession::OpensmileSession(string participant_id, string mqtt_host_inter
     this->pid = fork();
     if(!pid){
 	    this->Initialize();
-	    this->Loop(); 
+	    this->Loop();
     }
 }
 
@@ -63,20 +63,18 @@ void OpensmileSession::Initialize(){
                      0);
     smile_set_log_callback(this->handle, &log_callback, this->builder);
     this->opensmile_thread = std::thread(smile_run, this->handle);
-	
+    
+
     // Connect to broker
         BOOST_LOG_TRIVIAL(info) << "Initializing Mosquitto connection for: " << this->participant_id;
         this->connect(this->mqtt_host_internal, this->mqtt_port_internal, 1000, 1000, 1000);
-        this->subscribe(this->participant_id);
-	this->subscribe("shutdown");
+        this->subscribe(this->participant_id);	
         this->set_max_seconds_without_messages(10000);
         this->listener_thread = thread([this] { this->loop(); });
 
 }
 
 void OpensmileSession::Shutdown(){
-        BOOST_LOG_TRIVIAL(info) << "Shutting down Opensmile Session for: " << this->participant_id;
-
 	this->running = false;
 
 	// Close listening session
@@ -91,31 +89,24 @@ void OpensmileSession::Shutdown(){
 	exit(0);
 }
 
-
 void OpensmileSession::Loop(){
-	vector<float> float_chunk;
-	while(this->running){	
-		this->mutex.lock();
-	 	if(!this->queue.empty()){
-			float_chunk = this->queue.front();
-			this->queue.pop();
-		}
-		else{
-	    		this->mutex.unlock();
-			continue;
-		}
-		this->mutex.unlock();
-            
-		while (true) {
-			smileres_t result =
-				smile_extaudiosource_write_data(this->handle,
-								"externalAudioSource",
-								(void*)&float_chunk[0],
-								4096 * sizeof(float));
-			if (result == SMILE_SUCCESS) {
-				break;
-			}
-        	}
+	chrono::milliseconds duration(1);
+	while(true){
+		this_thread::yield();
+        	this_thread::sleep_for(duration);
+	}
+}
+
+void OpensmileSession::PublishChunk(vector<float> float_chunk){
+	while(true) {
+		smileres_t result =
+			smile_extaudiosource_write_data(this->handle,
+							"externalAudioSource",
+							(void*)&float_chunk[0],
+							4096 * sizeof(float));
+		if (result == SMILE_SUCCESS) {
+			break;
+		}	
 	}
 }
 
@@ -129,9 +120,6 @@ void OpensmileSession::on_message(const std::string& topic,const std::string& me
 	Base64decode(&decoded[0], coded_src.c_str());
 	vector<float> float_chunk(decoded.size()/sizeof(float));
 	memcpy(&float_chunk[0], &decoded[0], decoded.size());
-
-	// Send chunk
-	this->mutex.lock();
-		this->queue.push(float_chunk);
-	this->mutex.unlock();
+	
+	this->PublishChunk(float_chunk);
 }

@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-
-# Install dependencies for the tomcat-speechAnalyzer program using MacPorts
-
-sudo port -N install \
-    postgresql14\
-    protobuf-c\
-    grpc

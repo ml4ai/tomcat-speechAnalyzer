@@ -40,7 +40,7 @@ class DBWrapper {
     std::string port = "5432";
 
     // Connection data
-    int connection_pool_size = 20;
+    int connection_pool_size = 10;
     int active_connections = 0;
     std::stack<PGconn*> connection_pool;
     std::mutex connection_mutex;
