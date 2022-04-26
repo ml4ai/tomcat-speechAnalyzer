@@ -150,7 +150,7 @@ void Mosquitto::connect(const string& address, int port, int alive_delay,
 }
 
 void Mosquitto::subscribe(const string& topic) {
-    const int qos = 0;
+    const int qos = 2;
     int error_code =
         mosquitto_subscribe(this->mqtt_client, NULL, topic.c_str(), qos);
     if (error_code != MOSQ_ERR_SUCCESS) {
@@ -164,7 +164,7 @@ void Mosquitto::publish(const string& topic, const string& message) {
     const char* payload = message.c_str();
     const int len = (int)message.size();
 
-    const int qos = 0;
+    const int qos = 2;
     int error_code = mosquitto_publish(this->mqtt_client,
                                        NULL,
                                        topic.c_str(),

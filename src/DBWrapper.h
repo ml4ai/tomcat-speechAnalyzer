@@ -1,8 +1,10 @@
+#include <condition_variable>
 #include <libpq-fe.h>
 #include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <queue>
+#include <stack>
 #include <string>
 #include <thread>
 #include <vector>
@@ -12,27 +14,24 @@ class DBWrapper {
     DBWrapper();
     ~DBWrapper();
 
-    void initialize();
-    void shutdown();
-    PGconn* get_connection();
+    void Initialize();
+    void Shutdown();
+
     void publish_chunk(nlohmann::json message);
     std::vector<nlohmann::json> features_between(double start_time,
-                                                 double end_time);
-
-    std::string participant_id;
-    bool participant_id_set = false;
-    std::string trial_id;
-    bool trial_id_set = false;
-    std::string experiment_id;
-    double timestamp;
+                                                 double end_time,
+                                                 std::string participant_id,
+                                                 std::string trial_id);
 
   private:
+    // Util code for handling postgres and opensmile formats
     static const std::vector<char> INVALID_COLUMN_CHARACTERS;
     std::map<std::string, std::string> column_map;
+    void InitializeColumnMap();
     std::string format_to_db_string(std::string in);
 
+    // DB connection info
     std::string client_id;
-
     std::string connection_string;
     std::string user = "postgres";
     std::string pass = "docker";
@@ -40,13 +39,17 @@ class DBWrapper {
     std::string host = "features_db";
     std::string port = "5432";
 
-    int thread_pool_size = 1;
-    std::vector<std::thread> thread_pool;
-    std::vector<PGconn*> connection_pool;
-    std::vector<std::queue<nlohmann::json>> queue_pool;
+    // Connection data
+    int connection_pool_size = 10;
+    int active_connections = 0;
+    std::stack<PGconn*> connection_pool;
+    std::mutex connection_mutex;
+    std::condition_variable connection_condition;
+    PGconn* GetConnection();
+    void FreeConnection(PGconn* conn);
+    bool ConnectionAvaliable();
 
     bool running = false;
 
-    void publish_chunk_private(nlohmann::json message, int index);
-    void loop(int index);
+    void publish_chunk_private(nlohmann::json message);
 };
