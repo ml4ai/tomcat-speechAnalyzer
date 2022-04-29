@@ -96,6 +96,7 @@ void Mosquitto::mosquitto_callback_on_message(
     mosquitto->on_message(topic, ss.str());
 }
 
+
 //----------------------------------------------------------------------
 // Virtual functions
 //----------------------------------------------------------------------
