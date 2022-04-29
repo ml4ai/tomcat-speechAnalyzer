@@ -3,20 +3,23 @@
 #include <string.h>
 #include <thread>
 #include <vector>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <boost/log/trivial.hpp>
 
+#include <smileapi/SMILEapi.h>
+#include <mqtt/client.h>
+
 #include "GlobalMosquittoListener.h"
 #include "JsonBuilder.h"
 #include "base64.h"
 #include "util.h"
-#include <smileapi/SMILEapi.h>
+
 
 #include "OpensmileSession.h"
+
 
 OpensmileSession::OpensmileSession(string participant_id,
                                    string mqtt_host_internal,
@@ -67,21 +70,28 @@ void OpensmileSession::Initialize() {
     smile_set_log_callback(this->handle, &log_callback, this->builder);
     this->opensmile_thread = std::thread(smile_run, this->handle);
 
-    // Connect to broker
+    // Initialize paho mqtt Mosquitto client
     BOOST_LOG_TRIVIAL(info)
         << "Initializing Mosquitto connection for: " << this->participant_id;
-    this->connect(
-        this->mqtt_host_internal, this->mqtt_port_internal, 1000, 1000, 1000);
-    this->subscribe(this->participant_id);
-    this->set_max_seconds_without_messages(10000);
-    this->listener_thread = thread([this] { this->loop(); });
+    string client_id = this->participant_id + "_SPEECH_ANALYZER";
+    string server_address = "tcp://" + this->mqtt_host_internal + ":" + to_string(this->mqtt_port_internal);
+    this->mqtt_client = new mqtt::client(server_address, client_id);
+    
+    mqtt::connect_options connOpts;
+    connOpts.set_keep_alive_interval(20);
+    connOpts.set_clean_session(true);
+    
+    this->mqtt_client->connect(connOpts);
+    this->mqtt_client->subscribe(this->participant_id, 2);
+    
 }
 
 void OpensmileSession::Shutdown() {
     this->running = false;
 
     // Close listening session
-    this->close();
+    this->mqtt_client->stop_consuming();
+    this->mqtt_client->disconnect();
 
     // Close Opensmile Session
     smile_extaudiosource_set_external_eoi(this->handle, "externalAudioSource");
@@ -93,10 +103,17 @@ void OpensmileSession::Shutdown() {
 }
 
 void OpensmileSession::Loop() {
-    chrono::milliseconds duration(1);
+    BOOST_LOG_TRIVIAL(info)
+        << "Begin processing audio chunks for: " << this->participant_id;
     while (true) {
-        this_thread::yield();
-        this_thread::sleep_for(duration);
+	// Recieve message from broker
+	auto msg = this->mqtt_client->consume_message();
+	auto payload = msg->get_payload();
+
+	// Payload is always string, so needs to be copied to float vector
+	vector<float> float_chunk(payload.size());
+	memcpy(&float_chunk[0], payload.data(), payload.size()/sizeof(float));
+	this->PublishChunk(float_chunk);
     }
 }
 
@@ -113,17 +130,3 @@ void OpensmileSession::PublishChunk(vector<float> float_chunk) {
     }
 }
 
-void OpensmileSession::on_message(const std::string& topic,
-                                  const std::string& message) {
-    nlohmann::json m = nlohmann::json::parse(message);
-
-    // Decode base64 chunk
-    string coded_src = m["chunk"];
-    int encoded_data_length = Base64decode_len(coded_src.c_str());
-    vector<char> decoded(encoded_data_length);
-    Base64decode(&decoded[0], coded_src.c_str());
-    vector<float> float_chunk(decoded.size() / sizeof(float));
-    memcpy(&float_chunk[0], &decoded[0], decoded.size());
-
-    this->PublishChunk(float_chunk);
-}

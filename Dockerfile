@@ -1,4 +1,4 @@
-FROM ubuntu:focal
+FROM ubuntu:impish
 
 #ubuntu setup
 ENV DEBIAN_FRONTEND "noninteractive"
@@ -16,6 +16,9 @@ RUN apt-get update -y && apt-get upgrade -y && \
 
     # Mosquitto
     mosquitto mosquitto-clients libmosquitto-dev \
+    libssl-dev \
+    libpaho-mqttpp-dev \
+    libpaho-mqtt-dev \
 
     # PostgreSQL
     libpq-dev postgresql-server-dev-all
