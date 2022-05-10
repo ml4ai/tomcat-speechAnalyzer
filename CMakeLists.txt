@@ -18,6 +18,7 @@ find_package(
     program_options
     coroutine
     log
+    log_setup
     REQUIRED
 )
 find_package(nlohmann_json REQUIRED)
@@ -39,7 +40,6 @@ add_executable(speechAnalyzer
     src/TrialListener.cpp
     src/GlobalMosquittoListener.cpp
     src/OpensmileSession.cpp
-    # src/OpensmileListener.cpp
     src/DBWrapper.cpp
     src/util.cpp
     src/base64.c

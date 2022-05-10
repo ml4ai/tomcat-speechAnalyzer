@@ -6,6 +6,8 @@
 
 #include <boost/log/trivial.hpp>
 #include <boost/log/utility/setup/console.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/program_options.hpp>
 
 #include "ASRProcessor.h"
@@ -26,6 +28,8 @@ int main(int argc, char* argv[]) {
     // Enable Boost logging
     boost::log::add_console_log(std::cout,
                                 boost::log::keywords::auto_flush = true);
+    boost::log::add_file_log(boost::log::keywords::file_name = "/logs/%Y-%m-%d_%H-%M-%S.%N.log",
+                             boost::log::keywords::auto_flush = true);
 
     BOOST_LOG_TRIVIAL(info)
         << "Starting speechAnalyzer, awaiting for trial to begin... ";
