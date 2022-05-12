@@ -41,12 +41,6 @@ void JsonBuilder::Initialize() {
     // Setup connection with mosquitto broker
     this->mosquitto_client.connect(
         args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-
-    // Set the start time for the stream
-    this->stream_start_time =
-        boost::posix_time::microsec_clock::universal_time();
-    this->stream_start_time_vosk =
-        boost::posix_time::microsec_clock::universal_time();
 }
 
 void JsonBuilder::Shutdown() {
@@ -146,6 +140,7 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m) {
         return;
     }
 
+
     // Format and publish sentiment message
     nlohmann::json sentiment;
     sentiment["header"] = this->create_common_header("observation");
@@ -157,7 +152,6 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m) {
         message["data"]["sentiment"]["penultimate_emotions"];
     this->mosquitto_client.publish("agent/speech_analyzer/sentiment",
                                    sentiment.dump());
-    std::cout << sentiment.dump() << std::endl;
 
     // Format and publish personality message
     nlohmann::json personality;
@@ -170,7 +164,7 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m) {
         message["data"]["sentiment"]["penultimate_traits"];
     this->mosquitto_client.publish("agent/speech_analyzer/personality",
                                    personality.dump());
-    std::cout << personality.dump() << std::endl;
+    
 }
 
 // Data for handling word/feature alignment messages
@@ -232,44 +226,6 @@ string JsonBuilder::process_mmc_message(string message) {
     return "";
 }
 
-void JsonBuilder::process_audio_chunk_message(vector<char> chunk, string id) {
-    // Encode audio chunk
-    int encoded_data_length = Base64encode_len(chunk.size());
-    char output[encoded_data_length];
-    Base64encode(output, &chunk[0], chunk.size());
-    string encoded(output);
-
-    // Create message
-    nlohmann::json message;
-    message["header"] = create_common_header("observation");
-    message["msg"] = create_common_msg("audio_chunk");
-    message["data"]["chunk"] = encoded;
-    message["data"]["id"] = id;
-    this->mosquitto_client.publish("audio/chunk", message.dump());
-}
-
-void JsonBuilder::process_audio_chunk_metadata_message(vector<char> chunk,
-                                                       string id) {
-    // Check if in trial
-    if (!GLOBAL_LISTENER.in_trial) {
-        return;
-    }
-    nlohmann::json message;
-    message["header"] = create_common_header("metadata");
-    message["msg"] = create_common_msg("audio");
-    message["data"]["size"] = chunk.size();
-    message["data"]["format"] = "int16";
-    message["data"]["id"] = id;
-    message["data"]["participant_id"] = this->participant_id;
-    this->mosquitto_client.publish("agent/asr/metadata", message.dump());
-}
-
-void JsonBuilder::update_sync_time(double sync_time) {
-    this->sync_time = sync_time;
-    this->stream_start_time =
-        boost::posix_time::microsec_clock::universal_time();
-}
-
 // Methods for creating common message types
 nlohmann::json JsonBuilder::create_common_header(string message_type) {
     nlohmann::json header;
@@ -301,22 +257,3 @@ nlohmann::json JsonBuilder::create_common_msg(std::string sub_type) {
 
     return message;
 }
-
-void JsonBuilder::strip_mmc_message(nlohmann::json& message) {
-    // Remove buggy speaker field
-    message["data"]["sentiment"].erase("speaker");
-
-    // Remove features fields
-    message["data"].erase("features");
-    message["data"].erase("word_messages");
-
-    // Remove ASR Fields
-    message["data"].erase("alternatives");
-    message["data"].erase("asr_system");
-    message["data"].erase("is_final");
-    message["data"].erase("text");
-    message["data"].erase("start_timestamp");
-    message["data"].erase("end_timestamp");
-}
-
-void JsonBuilder::strip_features_message(nlohmann::json& message) {}

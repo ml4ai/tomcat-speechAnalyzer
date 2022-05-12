@@ -27,44 +27,12 @@ class JsonBuilder {
 
     // Process an openSMILE log messag
     void process_message(std::string message);
-
-    /*   // Process an asr message
-       void process_asr_message(
-           google::cloud::speech::v1::StreamingRecognizeResponse response,
-           std::string id);
-
-       // Process an asr message from vosk
-       void process_asr_message_vosk(std::string response);
-
-       // Process a word/feature alignment message
-       std::string process_alignment_message(
-           google::cloud::speech::v1::StreamingRecognizeResponse response,
-           std::string id);
-       std::string process_alignment_message_vosk(nlohmann::json response,
-                                                  std::string id);
-      */
     void process_sentiment_message(nlohmann::json m);
     std::string process_mmc_message(std::string message);
-    void strip_mmc_message(nlohmann::json& message);
-    void strip_features_message(nlohmann::json& message);
 
-    // Process a audio chunk message
-    void process_audio_chunk_message(std::vector<char> chunk, std::string id);
-    void process_audio_chunk_metadata_message(std::vector<char> chunk,
-                                              std::string id);
 
-    // Update the sync time for word/feature alignment messages
-    void update_sync_time(double sync_time);
 
   private:
-    // Time object for start of stream
-    boost::posix_time::ptime stream_start_time;
-    boost::posix_time::ptime stream_start_time_vosk;
-
-    // Bool object for determining start of utterance
-    bool is_initial = false;
-    std::string utterance_start_timestamp;
-
     // Mosquitto client objects
     Mosquitto mosquitto_client;
     TrialListener listener_client;
