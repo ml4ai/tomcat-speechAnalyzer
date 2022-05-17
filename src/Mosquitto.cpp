@@ -164,7 +164,7 @@ void Mosquitto::publish(const string& topic, const string& message) {
     const char* payload = message.c_str();
     const int len = (int)message.size();
 
-    const int qos = 2;
+    const int qos = 0;
     int error_code = mosquitto_publish(this->mqtt_client,
                                        NULL,
                                        topic.c_str(),
