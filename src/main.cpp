@@ -13,11 +13,20 @@
 #include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
+#include <boost/chrono.hpp>
+#include <boost/log/support/date_time.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/program_options.hpp>
 
 #include "ASRProcessor.h"
 #include "GlobalMosquittoListener.h"
 #include "arguments.h"
+
+namespace logging = boost::log;
+namespace src = boost::log::sources;
+namespace expr = boost::log::expressions;
+namespace keywords = boost::log::keywords;
 
 using namespace boost::program_options;
 using namespace std;
@@ -31,22 +40,25 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signal_callback_handler);
 
     // Enable Boost logging
+    boost::log::add_common_attributes();
     boost::log::add_console_log(std::cout,
                                 boost::log::keywords::auto_flush = true,
                                 boost::log::keywords::format =
-                                (
-                                  boost::log::expressions::stream
-                                      << boost::posix_time::second_clock::local_time() << ": "
-                                      << boost::log::expressions::smessage
-                                ));
+				(
+				    expr::stream
+					<< expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S")
+					<< ": <" << logging::trivial::severity
+					<< "> " << expr::smessage
+				));
     boost::log::add_file_log(boost::log::keywords::file_name = "/logs/%Y-%m-%d_%H-%M-%S.%N.log",
                              boost::log::keywords::auto_flush = true,
                              boost::log::keywords::format =
-                             (
-                                boost::log::expressions::stream
-                                    << boost::posix_time::second_clock::local_time() << ": "
-                                    << boost::log::expressions::smessage
-                             ));
+			     (
+				    expr::stream
+					<< expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S")
+					<< ": <" << logging::trivial::severity
+					<< "> " << expr::smessage
+				));
 
     BOOST_LOG_TRIVIAL(info)
         << "Starting speechAnalyzer, awaiting for trial to begin... ";
