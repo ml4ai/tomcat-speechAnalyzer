@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <string>
 #include <unistd.h>
+#include <fstream>
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
@@ -86,6 +87,13 @@ int main(int argc, char* argv[]) {
     }
     catch (exception e) {
     }
+
+    // Get SpeechAnalyzer version number
+    ifstream file("conf/SpeechAnalyzer_version.txt");
+    string version;
+    file >> version;
+    BOOST_LOG_TRIVIAL(info)
+        << "SpeechAnalyzer version: " << version;
 
     // Setup Global Listener
     JsonBuilder::args = args;

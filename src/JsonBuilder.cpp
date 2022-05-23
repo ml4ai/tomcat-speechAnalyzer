@@ -152,6 +152,7 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m) {
         message["data"]["sentiment"]["penultimate_emotions"];
     this->mosquitto_client.publish("agent/speech_analyzer/sentiment",
                                    sentiment.dump());
+    std::cout << sentiment.dump() << std::endl;
 
     // Format and publish personality message
     nlohmann::json personality;
@@ -164,7 +165,7 @@ void JsonBuilder::process_sentiment_message(nlohmann::json m) {
         message["data"]["sentiment"]["penultimate_traits"];
     this->mosquitto_client.publish("agent/speech_analyzer/personality",
                                    personality.dump());
-    
+    std::cout <<personality.dump() << std::endl;
 }
 
 // Data for handling word/feature alignment messages
