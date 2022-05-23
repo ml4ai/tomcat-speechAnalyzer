@@ -1,3 +1,4 @@
+// STDLIB
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -10,6 +11,7 @@
 #include <string>
 #include <vector>
 
+// Third Party 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/log/trivial.hpp>
@@ -20,55 +22,62 @@
 #include <libpq-fe.h>
 #include <nlohmann/json.hpp>
 
+// Local
 #include "DBWrapper.h"
-#include "GlobalMosquittoListener.h"
 
 using namespace std;
 
-const vector<char> DBWrapper::INVALID_COLUMN_CHARACTERS = {
-    '+', '-', '(', ')', '\n', '.'};
+DBWrapper::DBWrapper(int connection_pool_size) { 
+        this->connection_pool_size = connection_pool_size;
 
-DBWrapper::DBWrapper() { this->Initialize(); }
+        InitializeColumnMap();
+	InitializeConnections();
+}
 
-DBWrapper::~DBWrapper() {
-    if (this->running) {
-        this->Shutdown();
+void DBWrapper::InitializeColumnMap() {
+    ifstream file("conf/column_map.txt");
+    string opensmile_format;
+    string postgres_format;
+
+    while (!file.eof()) {
+        file >> opensmile_format;
+        file >> postgres_format;
+        column_map[opensmile_format] = postgres_format;
+        column_map[postgres_format] = opensmile_format;
     }
 }
 
-void DBWrapper::Initialize() {
-    this->running = true;
-
-    // Initialize Column Map
-    this->InitializeColumnMap();
-
-    // Create connection string
-    this->connection_string = "host=" + this->host + " port=" + this->port +
-                              " dbname=" + this->db + " user=" + this->user +
-                              " password= " + this->pass;
+void DBWrapper::InitializeConnections(){
+    string connection_string = "host=" + host + " port=" + port +
+                              " dbname=" + db + " user=" + user +
+                              " password= " + pass;
+    string CHUNK_EXTRACT_STR = "SELECT * FROM features WHERE seconds_offset >= $1 and seconds_offset <= $2 and participant = $3 and trial_id = $4;";
+    string CLEAR_TRIAL_STR = "DELETE FROM features WHERE trial_id = $1";
 
     // Initialize connection pool
-    for (int i = 0; i < this->connection_pool_size; i++) {
+    for (int i = 0; i < connection_pool_size; i++) {
         // Create connection objects
-        this->connection_pool.push(
-            PQconnectdb(this->connection_string.c_str()));
-    }
-}
+	PGconn* conn = PQconnectdb(connection_string.c_str());
+       
+        // Prepare statements
+	PQprepare(conn, "CHUNK_EXTRACT", CHUNK_EXTRACT_STR.c_str(), 4, NULL);  	
+	PQprepare(conn, "CLEAR_TRIAL", CLEAR_TRIAL_STR.c_str(), 1, NULL);  	
 
-void DBWrapper::Shutdown() {
-    this->running = false;
-    BOOST_LOG_TRIVIAL(info) << "Shutdown DB connections";
-}
+	// Push connection to pool
+	this->connection_pool.push(conn);
+    }
+
+} 
 
 PGconn* DBWrapper::GetConnection() {
     PGconn* conn;
     std::unique_lock<std::mutex> guard(connection_mutex);
-    if (this->ConnectionAvaliable()) {
+    if (ConnectionAvaliable()) {
         conn = connection_pool.top();
         connection_pool.pop();
     }
     else {
-        this->connection_condition.wait(
+        connection_condition.wait(
             guard, [this] { return this->ConnectionAvaliable(); });
         conn = connection_pool.top();
         connection_pool.pop();
@@ -78,34 +87,29 @@ PGconn* DBWrapper::GetConnection() {
 
 void DBWrapper::FreeConnection(PGconn* conn) {
     std::lock_guard<std::mutex> guard(connection_mutex);
-    this->connection_pool.push(conn);
-    this->connection_condition.notify_one();
+    connection_pool.push(conn);
+    connection_condition.notify_one();
 }
 
 bool DBWrapper::ConnectionAvaliable() {
-    if (this->connection_pool.empty()) {
+    if (connection_pool.empty()) {
         return false;
     }
     return true;
 }
-void DBWrapper::publish_chunk(nlohmann::json message) {
-    // Create thread object to handle io
-    std::thread io([this, message] { this->publish_chunk_private(message); });
-    io.detach();
-}
 
-void DBWrapper::publish_chunk_private(nlohmann::json message) {
+void DBWrapper::PublishChunk(nlohmann::json message) { 
     PGconn* conn;
     PGresult* result;
 
     // Get connection object from pool
-    conn = this->GetConnection();
+    conn = GetConnection();
 
     // Generate columns and values
     vector<string> columns;
     vector<double> values;
     for (auto element : message["data"]["features"]["lld"].items()) {
-        columns.push_back(this->format_to_db_string(element.key()));
+        columns.push_back(format_to_db_string(element.key()));
         values.push_back(element.value());
     }
 
@@ -154,38 +158,54 @@ void DBWrapper::publish_chunk_private(nlohmann::json message) {
     if (result == NULL) {
         BOOST_LOG_TRIVIAL(error) << "Execution error: " << PQerrorMessage(conn);
     }
-    // Clear result
+    
+    // Clean session
     PQclear(result);
-
-    // Add connection object back to pool
     this->FreeConnection(conn);
 }
 
-vector<nlohmann::json> DBWrapper::features_between(double start_time,
+void DBWrapper::ClearTrial(string trial_id){
+	PGconn *conn;
+	PGresult* result;
+
+	conn = GetConnection();
+
+	// Set data for prepared statement
+	const char* values[1];
+	int lengths[1];
+	values[0] = trial_id.c_str();
+	lengths[0] = strlen(values[0]);
+
+	// Run statement 
+	result = PQexecPrepared(conn, "CLEAR_TRIAL", 1, values, lengths, NULL, 0);
+
+	// Clean session
+	PQclear(result);
+	FreeConnection(conn);
+}
+
+vector<nlohmann::json> DBWrapper::FeaturesBetween(double start_time,
                                                    double end_time,
                                                    std::string participant_id,
                                                    std::string trial_id) {
     PGconn* conn;
     PGresult* result;
 
-    // Create connection
-    conn = PQconnectdb(this->connection_string.c_str());
-    if (PQstatus(conn) != CONNECTION_OK) {
-        BOOST_LOG_TRIVIAL(error)
-            << "Connection error: " << PQerrorMessage(conn);
-    }
+    conn = GetConnection();
+	
+    const char* values[4];
+    int lengths[4];
+    values[0] = to_string(start_time).c_str();
+    values[1] = to_string(end_time).c_str();
+    values[2] = participant_id.c_str();
+    values[3] = trial_id.c_str();
+    lengths[0] = strlen(values[0]);
+    lengths[1] = strlen(values[1]);
+    lengths[2] = strlen(values[2]);
+    lengths[3] = strlen(values[3]);
 
-    // Get features from database
-    std::string query = "SELECT * FROM features WHERE seconds_offset >= " +
-                        to_string(start_time) +
-                        " and seconds_offset <= " + to_string(end_time) +
-                        " and participant=" + "\'" + participant_id + "\'" +
-                        " and trial_id=" + "\'" + trial_id + "\'"; //+
-    result = PQexec(conn, query.c_str());
-    if (result == NULL) {
-        BOOST_LOG_TRIVIAL(error) << "FAILURE" << PQerrorMessage(conn);
-    }
-
+    result = PQexecPrepared(conn, "EXTRACT_CHUNK", 4, values, lengths, NULL, 0);
+    
     // Turn features into json object
     vector<nlohmann::json> out;
     for (int i = 0; i < PQntuples(result); i++) {
@@ -204,37 +224,10 @@ vector<nlohmann::json> DBWrapper::features_between(double start_time,
 
     // Clear result
     PQclear(result);
-    PQfinish(conn);
     return out;
 }
 
-void DBWrapper::InitializeColumnMap() {
-    ifstream file("conf/column_map.txt");
-    string opensmile_format;
-    string postgres_format;
-
-    while (!file.eof()) {
-        file >> opensmile_format;
-        file >> postgres_format;
-        this->column_map[opensmile_format] = postgres_format;
-        this->column_map[postgres_format] = opensmile_format;
-    }
-}
 
 string DBWrapper::format_to_db_string(std::string in) {
-    // Check if value already in map
-    if (this->column_map.find(in) != this->column_map.end()) {
-        return this->column_map[in];
-    }
-
-    string original = string(in);
-    boost::to_lower(in);
-    boost::replace_all(in, ")", "");
-    for (char c : this->INVALID_COLUMN_CHARACTERS) {
-        boost::replace_all(in, string(1, c), "_");
-    }
-    this->column_map[in] = original;
-    this->column_map[original] = in;
-
-    return in;
+	return column_map[in];
 }

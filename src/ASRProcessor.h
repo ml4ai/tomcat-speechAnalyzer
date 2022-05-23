@@ -1,46 +1,39 @@
 #pragma once
 
+// STDLIB
 #include <string>
 #include <thread>
 #include <vector>
 
+// Third party
 #include <nlohmann/json.hpp>
 
-#include "JsonBuilder.h"
+// Local
 #include "Mosquitto.h"
-#include "OpensmileSession.h"
-#include "arguments.h"
+#include "DBWrapper.h"
 
-class ASRProcessor : public Mosquitto {
-
+class ASRProcessor {
   public:
-    std::string trial_id = "00000000-0000-0000-0000-000000000000";
-    std::string experiment_id = "00000000-0000-0000-0000-000000000000";
+    std::string participant_id;
 
-    ASRProcessor(std::string mqtt_host, int mqtt_port,
-                 std::string mqtt_host_internal, int mqtt_port_internal);
-    ~ASRProcessor();
+    ASRProcessor(std::string mqtt_host, std::string mqtt_port);
 
-    bool running = true;
-
-  protected:
-    void on_message(const std::string& topic,
-                    const std::string& message) override;
-
-  private:
-    void Initialize();
-    void InitializeParticipants(std::vector<std::string> participants);
-    void ClearParticipants();
-    void Shutdown();
     void ProcessASRMessage(nlohmann::json m);
 
-    // MQTT options
-    std::string mqtt_host;
-    int mqtt_port;
-    std::string mqtt_host_internal;
-    int mqtt_port_internal;
 
-    JsonBuilder* builder;
-    std::vector<OpensmileSession*> participant_sessions;
-    std::thread listener_thread;
+
+  private:
+    std::string ProcessMMCMessage(std::string message);
+    
+    // Mosquitto client objects
+    std::string mqtt_host;
+    std::string mqtt_port;
+    Mosquitto mosquitto_client;
+
+    // DBWrapper object
+    unique_ptr<DBWrapper> postgres;
+
+    // Functions for creating cmomon message types
+    nlohmann::json create_common_header(std::string message_type);
+    nlohmann::json create_common_msg(std::string sub_type);
 };

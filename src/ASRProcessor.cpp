@@ -1,98 +1,210 @@
+// STDLIB
+#include <cstdlib>
 #include <string>
 #include <thread>
-#include <vector>
+#include <iostream>
 
+// Third Party - Boost
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
+#include <boost/asio/connect.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
+
+// Third Party
 #include <nlohmann/json.hpp>
 
+// Local
+#include "Mosquitto.h"
+#include "DBWrapper.h"
 #include "ASRProcessor.h"
-#include "OpensmileSession.h"
-#include "arguments.h"
+
+namespace beast = boost::beast; // from <boost/beast.hpp>
+namespace http = beast::http;   // from <boost/beast/http.hpp>
+namespace net = boost::asio;    // from <boost/asio.hpp>
+using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 using namespace std;
 
-ASRProcessor::ASRProcessor(string mqtt_host, int mqtt_port,
-                           string mqtt_host_internal, int mqtt_port_internal) {
+ASRProcessor::ASRProcessor(string mqtt_host, string mqtt_port) {
     this->mqtt_host = mqtt_host;
     this->mqtt_port = mqtt_port;
-    this->mqtt_host_internal = mqtt_host_internal;
-    this->mqtt_port_internal = mqtt_port_internal;
+    
+    postgres = make_shared<DBWrapper>(10); // 10 Connections for ASR processing  
 
-    this->Initialize();
+    mosquitto_client.connect(
+	mqtt_host, mqtt_port, 1000, 1000, 1000);
 }
 
-ASRProcessor::~ASRProcessor() { this->Shutdown(); }
+void ASRProcessor::ProcessASRMessage(nlohmann::json m) {
+    nlohmann::json message = m;
 
-void ASRProcessor::Initialize() {
-    this->builder = new JsonBuilder();
-    this->builder->Initialize();
+    // Generate aligned features
+    vector<nlohmann::json> word_messages;
+    for (nlohmann::json word_message : m["data"]["features"]["word_messages"]) {
+        double start_time = word_message["start_time"];
+        double end_time = word_message["end_time"];
 
-    // Make connection to external mqtt server
-    this->connect(this->mqtt_host, this->mqtt_port, 1000, 1000, 1000);
-    this->subscribe("trial");
-    this->subscribe("agent/asr/final");
-    this->set_max_seconds_without_messages(100000000);
-    this->listener_thread = thread([this] { this->loop(); });
-}
-
-void ASRProcessor::Shutdown() { this->ClearParticipants(); }
-
-void ASRProcessor::InitializeParticipants(vector<string> participants) {
-    for (int i = 0; i < participants.size(); i++) {
-        // Create OpensmileListener
-        this->participant_sessions.push_back(
-            new OpensmileSession(participants[i],
-                                 this->mqtt_host_internal,
-                                 this->mqtt_port_internal));
-    }
-}
-
-void ASRProcessor::ClearParticipants() {
-    // Free pointers
-    for (auto p : this->participant_sessions) {
-        delete p;
-    }
-
-    // Clear vector
-    this->participant_sessions.clear();
-}
-
-void ASRProcessor::on_message(const std::string& topic,
-                              const std::string& message) {
-    nlohmann::json m = nlohmann::json::parse(message);
-    if (topic.compare("trial") == 0) {
-        string sub_type = m["msg"]["sub_type"];
-        if (sub_type.compare("start") == 0) {
-            BOOST_LOG_TRIVIAL(info) << "Recieved trial start message, creating "
-                                       "Opensmile sessions...";
-            // Set trial info
-            this->trial_id = m["msg"]["trial_id"];
-            this->experiment_id = m["msg"]["experiment_id"];
-
-            // Set client info
-            vector<string> participants;
-            nlohmann::json client_info = m["data"]["client_info"];
-            for (nlohmann::json client : client_info) {
-                participants.push_back(client["playername"]);
+        vector<nlohmann::json> history =
+            postgres->FeaturesBetween(start_time,
+                                            end_time,
+                                            m["data"]["participant_id"],
+                                            m["msg"]["trial_id"]);
+        nlohmann::json features_output;
+        if (history.size() == 0) {
+            features_output = nullptr;
+            word_message["features"] = nullptr;
+        }
+        else {
+            for (auto& it : history[0].items()) {
+                features_output[it.key()] = vector<double>();
             }
-
-            // Initialize participant session
-            this->InitializeParticipants(participants);
+            // Load the features output from the history entries
+            for (auto entry : history) {
+                for (auto& it : history[0].items()) {
+                    features_output[it.key()].push_back(entry[it.key()]);
+                }
+            }
+            word_message["features"] = features_output.dump();
         }
-        else if (sub_type.compare("stop") == 0) {
-            BOOST_LOG_TRIVIAL(info) << "Recieved trial stop message, shutting "
-                                       "down Opensmile sessions...";
-
-            // Clear participant sessions
-            this->ClearParticipants();
-
-            BOOST_LOG_TRIVIAL(info) << "Ready for next trial";
-        }
+        word_messages.push_back(word_message);
     }
-    else if (topic.compare("agent/asr/final") == 0) {
-        // Process sentiment message in seperate thread
-        std::thread io = std::thread(
-            [this, m] { this->builder->process_sentiment_message(m); });
-        io.detach();
+    message["data"]["features"]["word_messages"] = word_messages;
+
+    // Send to MMC Server
+    message["data"]["word_messages"] =
+        message["data"]["features"]["word_messages"];
+    string features = message.dump();
+    string mmc = ProcessMMCMessage(message.dump());
+    try {
+        message["data"]["sentiment"] = nlohmann::json::parse(mmc);
     }
+    catch (std::exception e) {
+        std::cout << "Unable to process response from mmc server" << std::endl;
+        return;
+    }
+
+
+    // Format and publish sentiment message
+    nlohmann::json sentiment;
+    sentiment["header"] = create_common_header("observation");
+    sentiment["msg"] = create_common_msg("speech_analyzer:sentiment");
+    sentiment["data"]["utterance_id"] = message["data"]["utterance_id"];
+    sentiment["data"]["sentiment"]["emotions"] =
+        message["data"]["sentiment"]["emotions"];
+    sentiment["data"]["sentiment"]["penultimate_emotions"] =
+        message["data"]["sentiment"]["penultimate_emotions"];
+    this->mosquitto_client.publish("agent/speech_analyzer/sentiment",
+                                   sentiment.dump());
+    std::cout << sentiment.dump() << std::endl;
+
+    // Format and publish personality message
+    nlohmann::json personality;
+    personality["header"] = create_common_header("observation");
+    personality["msg"] = create_common_msg("speech_analyzer:personality");
+    personality["data"]["utterance_id"] = message["data"]["utterance_id"];
+    personality["data"]["personality"]["traits"] =
+        message["data"]["sentiment"]["traits"];
+    personality["data"]["personality"]["penultimate_traits"] =
+        message["data"]["sentiment"]["penultimate_traits"];
+    this->mosquitto_client.publish("agent/speech_analyzer/personality",
+                                   personality.dump());
+    std::cout << personality.dump() << std::endl;
+}
+
+// Data for handling word/feature alignment messages
+string ASRProcessor::ProcessMMCMessage(string message) {
+    try {
+        string host = "mmc";
+        string port = "8001";
+        string target = "/encode";
+        int version = 11;
+
+        net::io_context ioc;
+
+        // These objects perform our I/O
+        tcp::resolver resolver(ioc);
+        beast::tcp_stream stream(ioc);
+
+        // Look up the domain name
+        auto const results = resolver.resolve(host, port);
+
+        // Make the connection on the IP address we get from a lookup
+        stream.connect(results);
+
+        // Set up an HTTP GET request message
+        http::request<http::string_body> req{http::verb::get, target, version};
+        req.set(http::field::host, host);
+        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.body() = message;
+        req.prepare_payload();
+
+        // Send the HTTP request to the remote host
+        http::write(stream, req);
+
+        // This buffer is used for reading and must be persisted
+        beast::flat_buffer buffer;
+
+        // Declare a container to hold the response
+        http::response<http::string_body> res;
+
+        // Receive the HTTP response
+        http::read(stream, buffer, res);
+
+        // Write the message to standard out
+
+        // Gracefully close the socket
+        beast::error_code ec;
+        stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+
+        // not_connected happens sometimes
+        // so don't bother reporting it.
+        //
+        if (ec && ec != beast::errc::not_connected)
+            throw beast::system_error{ec};
+
+        return res.body().data();
+    }
+    catch (std::exception const& e) {
+        BOOST_LOG_TRIVIAL(error) << e.what();
+    }
+    return "";
+}
+
+// Methods for creating common message types
+nlohmann::json ASRProcessor::create_common_header(string message_type) {
+    nlohmann::json header;
+    string timestamp =
+        boost::posix_time::to_iso_extended_string(
+            boost::posix_time::microsec_clock::universal_time()) +
+        "Z";
+
+    header["timestamp"] = timestamp;
+    header["message_type"] = message_type;
+    header["version"] = "1.1";
+
+    return header;
+}
+
+nlohmann::json ASRProcessor::create_common_msg(std::string sub_type) {
+    nlohmann::json message;
+    string timestamp =
+        boost::posix_time::to_iso_extended_string(
+            boost::posix_time::microsec_clock::universal_time()) +
+        "Z";
+
+    message["timestamp"] = timestamp;
+    message["experiment_id"] = experiment_id;
+    message["trial_id"] = trial_id;
+    message["version"] = "0.6";
+    message["source"] = "tomcat_speech_analyzer";
+    message["sub_type"] = sub_type;
+
+    return message;
 }

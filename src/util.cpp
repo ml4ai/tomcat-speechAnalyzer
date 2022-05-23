@@ -1,22 +1,17 @@
-#include <boost/beast/core.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <stdio.h>
+// STDLIB
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
 #include <iostream>
 #include <thread>
 
+// Third Party
 #include <boost/log/trivial.hpp>
+#include <boost/beast/core.hpp>
 
-#include "GlobalMosquittoListener.h"
+// Local
+#include "OpensmileProcessor.h"
 #include "util.h"
 
 namespace beast = boost::beast; // from <boost/beast.hpp>
@@ -30,6 +25,6 @@ void fail(beast::error_code ec, char const* what) {
 
 // Callback function for openSMILE messages
 void log_callback(smileobj_t* smileobj, smilelogmsg_t message, void* param) {
-    JsonBuilder* builder = (JsonBuilder*)(param);
-    builder->process_message(message.text);
+    OpensmileProcessor* processor = (OpensmileProcessor*)(param);
+    processor->ProcessOpensmileLog(message.text);
 }

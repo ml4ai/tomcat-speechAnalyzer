@@ -1,9 +1,8 @@
-#include <cstdlib>
-#include <iostream>
-#include <signal.h>
+// STDLIB
 #include <string>
-#include <unistd.h>
+#include <fstring>
 
+// Boost
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
 #include <boost/log/expressions.hpp>
@@ -19,9 +18,9 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/program_options.hpp>
 
-#include "ASRProcessor.h"
-#include "GlobalMosquittoListener.h"
+// Local
 #include "arguments.h"
+#include "Manager.h"
 
 namespace logging = boost::log;
 namespace src = boost::log::sources;
@@ -31,14 +30,7 @@ namespace keywords = boost::log::keywords;
 using namespace boost::program_options;
 using namespace std;
 
-Arguments JsonBuilder::args;
-bool RUNNING = true;
-void signal_callback_handler(int signum) { RUNNING = false; }
-
 int main(int argc, char* argv[]) {
-    // Set up callback for SIGINT
-    signal(SIGINT, signal_callback_handler);
-
     // Enable Boost logging
     boost::log::add_common_attributes();
     boost::log::add_console_log(std::cout,
@@ -60,8 +52,13 @@ int main(int argc, char* argv[]) {
 					<< "> " << expr::smessage
 				));
 
+    // Get SpeechAnalyzer version number
+    ifstream file("conf/SpeechAnalyzer_version.txt");
+    string version;
+    file >> version;
     BOOST_LOG_TRIVIAL(info)
-        << "Starting speechAnalyzer, awaiting for trial to begin... ";
+        << "SpeechAnalyzer version: " << version;
+
     Arguments args;
     try {
         options_description desc{"Options"};
@@ -85,29 +82,24 @@ int main(int argc, char* argv[]) {
         notify(vm);
     }
     catch (exception e) {
+    	BOOST_LOG_TRIVIAL(error)
+        	<< "Unable to parse arguments, exiting... ";
+	exit(-1);
     }
-
-    // Setup Global Listener
-    JsonBuilder::args = args;
-    GLOBAL_LISTENER.connect(args.mqtt_host, args.mqtt_port, 1000, 1000, 1000);
-    GLOBAL_LISTENER.subscribe("trial");
-    GLOBAL_LISTENER.subscribe("experiment");
-    GLOBAL_LISTENER.set_max_seconds_without_messages(
-        2147483647); // Max Long value
-    GLOBAL_LISTENER_THREAD = thread([] { GLOBAL_LISTENER.loop(); });
-
-    // Launch ASRProcessor
-    ASRProcessor* processor = new ASRProcessor(args.mqtt_host,
-                                               args.mqtt_port,
-                                               args.mqtt_host_internal,
-                                               args.mqtt_port_internal);
+ 
+    BOOST_LOG_TRIVIAL(info)
+        << "Starting speechAnalyzer, awaiting for trial to begin... ";
+    
+    // Launch Manager
+    Manager manager(args.mqtt_host,
+                    args.mqtt_port,
+                    args.mqtt_host_internal,
+                    args.mqtt_port_internal);
 
     // Yield main thread until exit
     chrono::milliseconds duration(1);
-    while (RUNNING) {
+    while (true) {
         this_thread::yield();
         this_thread::sleep_for(duration);
     }
-
-    exit(0);
 }

@@ -34,12 +34,11 @@ find_package(PostgreSQL REQUIRED)
 
 add_executable(speechAnalyzer 
     src/main.cpp
-    src/ASRProcessor.cpp
-    src/JsonBuilder.cpp
+    src/Manager.cpp
     src/Mosquitto.cpp
-    src/TrialListener.cpp
-    src/GlobalMosquittoListener.cpp
     src/OpensmileSession.cpp
+    src/OpensmileProcessor.cpp
+    src/ASRProcessor.cpp
     src/DBWrapper.cpp
     src/util.cpp
     src/base64.c
