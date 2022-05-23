@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <string>
 #include <unistd.h>
+#include <ifstream>
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
@@ -59,6 +60,13 @@ int main(int argc, char* argv[]) {
 					<< ": <" << logging::trivial::severity
 					<< "> " << expr::smessage
 				));
+
+     // Get SpeechAnalyzer version number
+    ifstream file("conf/SpeechAnalyzer_version.txt");
+    string version;
+    file >> version;
+    BOOST_LOG_TRIVIAL(info)
+        << "SpeechAnalyzer version: " << version;
 
     BOOST_LOG_TRIVIAL(info)
         << "Starting speechAnalyzer, awaiting for trial to begin... ";
