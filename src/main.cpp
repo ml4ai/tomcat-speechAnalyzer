@@ -61,6 +61,13 @@ int main(int argc, char* argv[]) {
 					<< "> " << expr::smessage
 				));
 
+     // Get SpeechAnalyzer version number
+    ifstream file("conf/SpeechAnalyzer_version.txt");
+    string version;
+    file >> version;
+    BOOST_LOG_TRIVIAL(info)
+        << "SpeechAnalyzer version: " << version;
+
     BOOST_LOG_TRIVIAL(info)
         << "Starting speechAnalyzer, awaiting for trial to begin... ";
     Arguments args;
