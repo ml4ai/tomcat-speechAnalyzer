@@ -12,9 +12,9 @@
 #include <smileapi/SMILEapi.h>
 
 // Local
-#include "JsonBuilder.h"
 #include "base64.h"
 #include "util.h"
+#include "OpensmileProcessor.h"
 #include "OpensmileSession.h"
 
 using namespace std;
@@ -41,7 +41,7 @@ OpensmileSession::OpensmileSession(string participant_id,
 	    listener_thread = thread([this] { this->loop(); });
 	   
 	    // Create processor for processing Opensmile log messages  
-	    processor = make_shared<OpensmileProcessor>(participant_id, trial_id, experiment_id);
+	    processor = new OpensmileProcessor(participant_id, trial_id, experiment_id);
        
 	   // Run Opensmile session 
 	    handle = smile_new();

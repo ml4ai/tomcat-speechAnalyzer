@@ -1,4 +1,5 @@
 #pragma once
+
 // STDLIB
 #include <iostream>
 #include <mutex>
@@ -13,6 +14,7 @@
 #include <smileapi/SMILEapi.h>
 
 // Local
+#include "Mosquitto.h"
 #include "OpensmileProcessor.h"
 
 class OpensmileSession : Mosquitto {

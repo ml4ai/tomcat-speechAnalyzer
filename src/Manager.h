@@ -1,8 +1,10 @@
 #pragma once
+
 // STDLIB
 #include <string>
 #include <thread>
 #include <vector>
+#include <memory>
 
 // Third Party
 #include <nlohmann/json.hpp>
@@ -35,8 +37,8 @@ class Manager : public Mosquitto {
     std::string mqtt_host_internal;
     int mqtt_port_internal;
 
-    unique_ptr<ASRProcessor> processor;
-    unique_ptr<DBWrapper> postgres;
+    std::unique_ptr<ASRProcessor> processor;
+    std::unique_ptr<DBWrapper> postgres;
     
     std::vector<OpensmileSession*> participant_sessions;
    

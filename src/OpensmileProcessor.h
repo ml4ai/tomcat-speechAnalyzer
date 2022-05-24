@@ -29,7 +29,7 @@ class OpensmileProcessor {
     bool tmeta = false;
     
     // DBWrapper object
-    unique_ptr<DBWrapper> postgres;
+    std::unique_ptr<DBWrapper> postgres;
 
     // Functions for creating cmomon message types
     nlohmann::json create_common_header(std::string message_type);

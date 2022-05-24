@@ -36,9 +36,9 @@ add_executable(speechAnalyzer
     src/main.cpp
     src/Manager.cpp
     src/Mosquitto.cpp
+    src/ASRProcessor.cpp
     src/OpensmileSession.cpp
     src/OpensmileProcessor.cpp
-    src/ASRProcessor.cpp
     src/DBWrapper.cpp
     src/util.cpp
     src/base64.c

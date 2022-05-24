@@ -1,3 +1,5 @@
+#pragma once 
+
 // STDLIB
 #include <condition_variable>
 #include <map>

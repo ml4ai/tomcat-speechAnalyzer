@@ -32,18 +32,21 @@ using tcp = net::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 
 using namespace std;
 
-ASRProcessor::ASRProcessor(string mqtt_host, string mqtt_port) {
+ASRProcessor::ASRProcessor(string mqtt_host, int mqtt_port) {
     this->mqtt_host = mqtt_host;
     this->mqtt_port = mqtt_port;
     
-    postgres = make_shared<DBWrapper>(10); // 10 Connections for ASR processing  
+    postgres = make_unique<DBWrapper>(10); // 10 Connections for ASR processing  
 
     mosquitto_client.connect(
 	mqtt_host, mqtt_port, 1000, 1000, 1000);
 }
 
 void ASRProcessor::ProcessASRMessage(nlohmann::json m) {
+    
     nlohmann::json message = m;
+    string trial_id = m["msg"]["trial_id"];
+    string experiment_id = m["msg"]["experiment_id"];
 
     // Generate aligned features
     vector<nlohmann::json> word_messages;
@@ -93,8 +96,8 @@ void ASRProcessor::ProcessASRMessage(nlohmann::json m) {
 
     // Format and publish sentiment message
     nlohmann::json sentiment;
-    sentiment["header"] = create_common_header("observation");
-    sentiment["msg"] = create_common_msg("speech_analyzer:sentiment");
+    sentiment["header"] = create_common_header("observation", trial_id, experiment_id);
+    sentiment["msg"] = create_common_msg("speech_analyzer:sentiment", trial_id, experiment_id);
     sentiment["data"]["utterance_id"] = message["data"]["utterance_id"];
     sentiment["data"]["sentiment"]["emotions"] =
         message["data"]["sentiment"]["emotions"];
@@ -102,12 +105,12 @@ void ASRProcessor::ProcessASRMessage(nlohmann::json m) {
         message["data"]["sentiment"]["penultimate_emotions"];
     this->mosquitto_client.publish("agent/speech_analyzer/sentiment",
                                    sentiment.dump());
-    std::cout << sentiment.dump() << std::endl;
+    BOOST_LOG_TRIVIAL(info) << sentiment.dump();
 
     // Format and publish personality message
     nlohmann::json personality;
-    personality["header"] = create_common_header("observation");
-    personality["msg"] = create_common_msg("speech_analyzer:personality");
+    personality["header"] = create_common_header("observation", trial_id, experiment_id);
+    personality["msg"] = create_common_msg("speech_analyzer:personality", trial_id, experiment_id);
     personality["data"]["utterance_id"] = message["data"]["utterance_id"];
     personality["data"]["personality"]["traits"] =
         message["data"]["sentiment"]["traits"];
@@ -115,7 +118,7 @@ void ASRProcessor::ProcessASRMessage(nlohmann::json m) {
         message["data"]["sentiment"]["penultimate_traits"];
     this->mosquitto_client.publish("agent/speech_analyzer/personality",
                                    personality.dump());
-    std::cout << personality.dump() << std::endl;
+    BOOST_LOG_TRIVIAL(info) << personality.dump();
 }
 
 // Data for handling word/feature alignment messages
@@ -178,7 +181,7 @@ string ASRProcessor::ProcessMMCMessage(string message) {
 }
 
 // Methods for creating common message types
-nlohmann::json ASRProcessor::create_common_header(string message_type) {
+nlohmann::json ASRProcessor::create_common_header(string message_type, string trial_id, string experiment_id) {
     nlohmann::json header;
     string timestamp =
         boost::posix_time::to_iso_extended_string(
@@ -192,7 +195,7 @@ nlohmann::json ASRProcessor::create_common_header(string message_type) {
     return header;
 }
 
-nlohmann::json ASRProcessor::create_common_msg(std::string sub_type) {
+nlohmann::json ASRProcessor::create_common_msg(std::string sub_type, string trial_id, string experiment_id) {
     nlohmann::json message;
     string timestamp =
         boost::posix_time::to_iso_extended_string(

@@ -2,6 +2,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <memory>
 
 // Third Party
 #include <boost/log/trivial.hpp>
@@ -10,7 +11,6 @@
 // Local
 #include "ASRProcessor.h"
 #include "OpensmileSession.h"
-#include "arguments.h"
 #include "Manager.h"
 
 using namespace std;
@@ -23,10 +23,10 @@ Manager::Manager(string mqtt_host, int mqtt_port,
     this->mqtt_port_internal = mqtt_port_internal;
 
     // Initialize JsonBuilder
-    processor = new ASRProcessor(mqtt_host, mqtt_port);
+    processor = make_unique<ASRProcessor>(mqtt_host, mqtt_port);
 
     // Initialize Database connection to clear trial
-    postgres = new DBWrapper(1); // Only one connection needed at a time for trial clearing
+    postgres = make_unique<DBWrapper>(1); // Only one connection needed at a time for trial clearing
 
     // Make connection to external mqtt server
     connect(mqtt_host, mqtt_port, 1000, 1000, 1000);
@@ -49,6 +49,7 @@ void Manager::InitializeParticipants(vector<string> participants, string trial_i
 }
 
 void Manager::ClearParticipants() {
+    
     // Free pointers
     for (auto p : this->participant_sessions) {
         delete p;
@@ -63,6 +64,8 @@ void Manager::on_message(const std::string& topic,
     nlohmann::json m = nlohmann::json::parse(message);
     if (topic.compare("trial") == 0) {
         string sub_type = m["msg"]["sub_type"];
+	string trial_id = m["msg"]["trial_id"];
+	string experiment_id = m["msg"]["experiment_id"];
         if (sub_type.compare("start") == 0) {
             BOOST_LOG_TRIVIAL(info) << "Recieved trial start message, creating "
                                        "Opensmile sessions...";
@@ -75,10 +78,10 @@ void Manager::on_message(const std::string& topic,
             }
 
 	    // Clear trial in database
-	    postgres->ClearTrial(m["msg"]["trial_id"]);
+	    postgres->ClearTrial(trial_id);
 
             // Initialize participant session
-            InitializeParticipants(participants);
+            InitializeParticipants(participants, trial_id, experiment_id);
         }
         else if (sub_type.compare("stop") == 0) {
             BOOST_LOG_TRIVIAL(info) << "Recieved trial stop message, shutting "
@@ -91,9 +94,10 @@ void Manager::on_message(const std::string& topic,
         }
     }
     else if (topic.compare("agent/asr/final") == 0) {
+        BOOST_LOG_TRIVIAL(info) << "Recieved ASR message, processing sentiment/personality data...";
         // Process sentiment message in seperate thread
         std::thread io = std::thread(
-            [this, m] { processor->ProcessASRMessage(m); });
+            [this, m] { this->processor->ProcessASRMessage(m); });
         io.detach();
     }
 }

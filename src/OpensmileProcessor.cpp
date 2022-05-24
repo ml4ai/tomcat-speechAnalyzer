@@ -34,7 +34,7 @@ void OpensmileProcessor::ProcessOpensmileLog(string message) {
     temp.erase(remove(temp.begin(), temp.end(), ' '), temp.end());
     if (tmeta) {
         if (temp.find("lld") != string::npos) {
-            postgres.PublishChunk(opensmile_message);
+            postgres->PublishChunk(opensmile_message);
             opensmile_message["data"]["participant_id"] =
                 participant_id;
             opensmile_message["header"] =

@@ -53,13 +53,12 @@ void DBWrapper::InitializeConnections(){
                               " password= " + pass;
     string CHUNK_EXTRACT_STR = "SELECT * FROM features WHERE seconds_offset >= $1 and seconds_offset <= $2 and participant = $3 and trial_id = $4;";
     string CLEAR_TRIAL_STR = "DELETE FROM features WHERE trial_id = $1";
-
     // Initialize connection pool
     for (int i = 0; i < connection_pool_size; i++) {
-        // Create connection objects
-	PGconn* conn = PQconnectdb(connection_string.c_str());
-       
-        // Prepare statements
+        // Create connection object
+	PGconn* conn;
+	conn = PQconnectdb(connection_string.c_str());
+		
 	PQprepare(conn, "CHUNK_EXTRACT", CHUNK_EXTRACT_STR.c_str(), 4, NULL);  	
 	PQprepare(conn, "CLEAR_TRIAL", CLEAR_TRIAL_STR.c_str(), 1, NULL);  	
 
@@ -204,7 +203,7 @@ vector<nlohmann::json> DBWrapper::FeaturesBetween(double start_time,
     lengths[2] = strlen(values[2]);
     lengths[3] = strlen(values[3]);
 
-    result = PQexecPrepared(conn, "EXTRACT_CHUNK", 4, values, lengths, NULL, 0);
+    result = PQexecPrepared(conn, "CHUNK_EXTRACT", 4, values, lengths, NULL, 0);
     
     // Turn features into json object
     vector<nlohmann::json> out;
@@ -222,8 +221,9 @@ vector<nlohmann::json> DBWrapper::FeaturesBetween(double start_time,
         out.push_back(message);
     }
 
-    // Clear result
+    // Clean session
     PQclear(result);
+    FreeConnection(conn);
     return out;
 }
 
