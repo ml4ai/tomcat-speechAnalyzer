@@ -53,14 +53,20 @@ void DBWrapper::InitializeConnections(){
                               " password= " + pass;
     string CHUNK_EXTRACT_STR = "SELECT * FROM features WHERE seconds_offset >= $1 and seconds_offset <= $2 and participant = $3 and trial_id = $4;";
     string CLEAR_TRIAL_STR = "DELETE FROM features WHERE trial_id = $1";
+    string INDECIES = "CREATE INDEX extract ON features (trial_id, experiment_id, participant, seconds_offset);";
+
     // Initialize connection pool
     for (int i = 0; i < connection_pool_size; i++) {
         // Create connection object
 	PGconn* conn;
 	conn = PQconnectdb(connection_string.c_str());
-		
+
+	// Prepare statements	
 	PQprepare(conn, "CHUNK_EXTRACT", CHUNK_EXTRACT_STR.c_str(), 4, NULL);  	
 	PQprepare(conn, "CLEAR_TRIAL", CLEAR_TRIAL_STR.c_str(), 1, NULL);  	
+
+	// Create indecies
+	PQexec(conn, INDECIES.c_str());
 
 	// Push connection to pool
 	this->connection_pool.push(conn);

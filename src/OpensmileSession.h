@@ -24,7 +24,7 @@ class OpensmileSession : Mosquitto {
     void KillSession();
   
   private:
-    void PublishChunk(std::vector<float> float_chunk);
+    void PublishChunk(const std::vector<float>& float_chunk);
     void on_message(const std::string& topic,
                     const std::string& message) override;
 

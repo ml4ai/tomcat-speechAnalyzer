@@ -26,7 +26,7 @@ OpensmileProcessor::OpensmileProcessor(string participant_id, string trial_id, s
     this->experiment_id = experiment_id;
 
     // Create database object
-    postgres = make_unique<DBWrapper>(25); // 25 connections for publishing chunks 
+    postgres = make_unique<DBWrapper>(100); // 25 connections for publishing chunks 
 }
 
 void OpensmileProcessor::ProcessOpensmileLog(string message) {

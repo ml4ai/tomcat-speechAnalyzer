@@ -36,7 +36,7 @@ ASRProcessor::ASRProcessor(string mqtt_host, int mqtt_port) {
     this->mqtt_host = mqtt_host;
     this->mqtt_port = mqtt_port;
     
-    postgres = make_unique<DBWrapper>(10); // 10 Connections for ASR processing  
+    postgres = make_unique<DBWrapper>(30); // 30 Connections for ASR processing (Assume processing 3 10-word utterances) 
 
     mosquitto_client.connect(
 	mqtt_host, mqtt_port, 1000, 1000, 1000);

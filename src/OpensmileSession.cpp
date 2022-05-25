@@ -65,13 +65,13 @@ void OpensmileSession::KillSession(){
     }
 }
 
-void OpensmileSession::PublishChunk(vector<float> float_chunk) {
+void OpensmileSession::PublishChunk(const vector<float>& float_chunk) {
     while (true) {
         smileres_t result =
             smile_extaudiosource_write_data(handle,
                                             "externalAudioSource",
                                             (void*)&float_chunk[0],
-                                            4096 * sizeof(float));
+                                            float_chunk.size()*sizeof(float));
         if (result == SMILE_SUCCESS) {
             break;
         }
@@ -85,10 +85,10 @@ void OpensmileSession::on_message(const std::string& topic,
     // Decode base64 chunk
     string coded_src = m["chunk"];
     int encoded_data_length = Base64decode_len(coded_src.c_str());
-    vector<char> decoded(encoded_data_length);
+    vector<char> decoded(encoded_data_length); // Chunk size 8194 byte (8192 for audio + 2 for /0)s
     Base64decode(&decoded[0], coded_src.c_str());
-    vector<float> float_chunk(decoded.size() / sizeof(float));
-    memcpy(&float_chunk[0], &decoded[0], decoded.size());
+    vector<float> float_chunk(decoded.size()-2 / sizeof(float));
+    memcpy(&float_chunk[0], &decoded[0], decoded.size()-2);
 
     PublishChunk(float_chunk);
 }
