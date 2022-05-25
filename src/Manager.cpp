@@ -38,7 +38,7 @@ Manager::Manager(string mqtt_host, int mqtt_port,
 
 void Manager::InitializeParticipants(vector<string> participants, string trial_id, string experiment_id) {
     for (int i = 0; i < participants.size(); i++) {
-        // Create OpensmileListener
+	// Create OpensmileListener
         participant_sessions.push_back(
             new OpensmileSession(participants[i],
                                  mqtt_host_internal,
@@ -49,10 +49,11 @@ void Manager::InitializeParticipants(vector<string> participants, string trial_i
 }
 
 void Manager::ClearParticipants() {
-    
+
     // Free pointers
     for (auto p : this->participant_sessions) {
-        delete p;
+        p->KillSession(); // Send SIGINT to Opensmile Process
+    	delete p;
     }
 
     // Clear vector
