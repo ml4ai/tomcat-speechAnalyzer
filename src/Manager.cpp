@@ -52,7 +52,6 @@ void Manager::ClearParticipants() {
 
     // Free pointers
     for (auto p : this->participant_sessions) {
-        p->KillSession(); // Send SIGINT to Opensmile Process
     	delete p;
     }
 
@@ -75,7 +74,7 @@ void Manager::on_message(const std::string& topic,
             vector<string> participants;
             nlohmann::json client_info = m["data"]["client_info"];
             for (nlohmann::json client : client_info) {
-                participants.push_back(client["playername"]);
+                participants.push_back(client["playername"]); //Switch back to playername
             }
 
 	    // Clear trial in database

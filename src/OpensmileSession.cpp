@@ -59,7 +59,7 @@ OpensmileSession::OpensmileSession(string participant_id,
     }
 }
 
-void OpensmileSession::KillSession(){
+OpensmileSession::~OpensmileSession(){
     if(pid){
     	kill(pid, SIGTERM);
     }
@@ -85,9 +85,9 @@ void OpensmileSession::on_message(const std::string& topic,
     // Decode base64 chunk
     string coded_src = m["chunk"];
     int encoded_data_length = Base64decode_len(coded_src.c_str());
-    vector<char> decoded(encoded_data_length); // Chunk size 8194 byte (8192 for audio + 2 for /0)s
+    vector<char> decoded(encoded_data_length); // Chunk size 16386  byte (16384 for audio + 2 for /0)s
     Base64decode(&decoded[0], coded_src.c_str());
-    vector<float> float_chunk(decoded.size()-2 / sizeof(float));
+    vector<float> float_chunk((decoded.size()-2) / sizeof(float));
     memcpy(&float_chunk[0], &decoded[0], decoded.size()-2);
 
     PublishChunk(float_chunk);

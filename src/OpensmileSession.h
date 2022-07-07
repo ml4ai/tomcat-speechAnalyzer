@@ -21,8 +21,7 @@ class OpensmileSession : Mosquitto {
   public:
     OpensmileSession(std::string participant_id, std::string mqtt_host_internal,
                      int mqtt_port_internal, std::string trial_id, std::string experiment_id);
-    void KillSession();
-  
+    ~OpensmileSession();  
   private:
     void PublishChunk(const std::vector<float>& float_chunk);
     void on_message(const std::string& topic,
@@ -30,17 +29,19 @@ class OpensmileSession : Mosquitto {
 
     int pid;
 
-    // MQTT data
-    std::string mqtt_host_internal;
-    int mqtt_port_internal;
-    std::thread listener_thread;
-
     // Trial data
     std::string participant_id;
     std::string trial_id;
     std::string experiment_id;
 
-    // Processors
+    // MQTT data
+    std::string mqtt_host_internal;
+    int mqtt_port_internal;
+    std::thread listener_thread;
+
+
+    // Opensmile data
     OpensmileProcessor* processor;
     smileobj_t* handle;
+    std::thread opensmile_thread;
 };

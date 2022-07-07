@@ -34,6 +34,7 @@ DBWrapper::DBWrapper(int connection_pool_size) {
 	InitializeConnections();
 }
 
+
 void DBWrapper::InitializeColumnMap() {
     ifstream file("conf/column_map.txt");
     string opensmile_format;
@@ -59,17 +60,17 @@ void DBWrapper::InitializeConnections(){
     for (int i = 0; i < connection_pool_size; i++) {
         // Create connection object
 	PGconn* conn;
-	conn = PQconnectdb(connection_string.c_str());
+	conn = PQconnectdb(connection_string.c_str());	
+	
+	    // Prepare statements	
+	    PQprepare(conn, "CLEAR_TRIAL", CLEAR_TRIAL_STR.c_str(), 1, NULL);  	
+	    PQprepare(conn, "CHUNK_EXTRACT", CHUNK_EXTRACT_STR.c_str(), 4, NULL);  	 
 
-	// Prepare statements	
-	PQprepare(conn, "CHUNK_EXTRACT", CHUNK_EXTRACT_STR.c_str(), 4, NULL);  	
-	PQprepare(conn, "CLEAR_TRIAL", CLEAR_TRIAL_STR.c_str(), 1, NULL);  	
+	    // Create indecies
+	    PQexec(conn, INDECIES.c_str());
 
-	// Create indecies
-	PQexec(conn, INDECIES.c_str());
-
-	// Push connection to pool
-	this->connection_pool.push(conn);
+	    // Push connection to pool
+	    this->connection_pool.push(conn);
     }
 
 } 
@@ -209,6 +210,10 @@ vector<nlohmann::json> DBWrapper::FeaturesBetween(double start_time,
     lengths[2] = strlen(values[2]);
     lengths[3] = strlen(values[3]);
 
+    std::cout << values[0] << std::endl;
+    std::cout << values[1] << std::endl;
+    std::cout << values[2] << std::endl;
+    std::cout << values[3] << std::endl;
     result = PQexecPrepared(conn, "CHUNK_EXTRACT", 4, values, lengths, NULL, 0);
     
     // Turn features into json object
