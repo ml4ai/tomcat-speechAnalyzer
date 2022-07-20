@@ -1,5 +1,5 @@
-F0final_sma audspec_lengthl1norm_sma
-F0final_sma_de audspec_lengthl1norm_sma_de
+F0final_sma f0final_sma
+F0final_sma_de f0final_sma_de
 audSpec_Rfilt_sma(0) audspec_rfilt_sma_0
 audSpec_Rfilt_sma(1) audspec_rfilt_sma_1
 audSpec_Rfilt_sma(10) audspec_rfilt_sma_10
@@ -54,8 +54,8 @@ audSpec_Rfilt_sma_de(8) audspec_rfilt_sma_de_8
 audSpec_Rfilt_sma_de(9) audspec_rfilt_sma_de_9
 audspecRasta_lengthL1norm_sma audspecrasta_lengthl1norm_sma
 audspecRasta_lengthL1norm_sma_de audspecrasta_lengthl1norm_sma_de
-audspec_lengthL1norm_sma f0final_sma
-audspec_lengthL1norm_sma_de f0final_sma_de
+audspec_lengthL1norm_sma audspec_lengthl1norm_sma
+audspec_lengthL1norm_sma_de audspec_lengthl1norm_sma_de
 jitterDDP_sma jitterddp_sma
 jitterDDP_sma_de jitterddp_sma_de
 jitterLocal_sma jitterlocal_sma
